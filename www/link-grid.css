@@ -3,15 +3,18 @@
 html, body {
   background-color: var(--lg-bg);
   color: var(--lg-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* Container that centers the grid vertically */
 .lg-page {
-  min-height: 100vh;
+  /* Leave space for sticky header (if present) */
+  min-height: calc(100vh - var(--nav-height, 0px));
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  padding-top: 8px;
 }
 
 /* Grid of links */
@@ -40,18 +43,18 @@ html, body {
 }
 
 .lg-button img {
-  width: 88%;
-  height: 88%;
+  width: 75%;
+  height: 75%;
   object-fit: contain;
   display: block;
   pointer-events: none;
 }
 
 .lg-button.selected {
-  outline: 4px solid var(--lg-sel);
-  outline-offset: 5px;
+  outline: 9px solid var(--lg-sel);
+  outline-offset:12 px;
   transform: scale(1.05);
-  box-shadow: 0 0 25px rgba(255,215,0,.7);
+  box-shadow: 0 0 50px rgba(2, 61, 28, 0.7);
 }
 
 .lg-button:focus { outline: none; }

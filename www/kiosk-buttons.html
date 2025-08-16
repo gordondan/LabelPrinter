@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kiosk Interface</title>
+    <link rel="stylesheet" href="/nav.css">
     <style>
         /* --- 1. Basic Kiosk Styling --- */
         html, body {
@@ -104,8 +105,10 @@
             transform: scale(0.95);
         }
     </style>
+    <script src="/nav.js"></script>
 </head>
 <body>
+    <script>document.addEventListener('DOMContentLoaded', ()=> window.renderSiteHeader());</script>
 
     <!-- UPDATED: Grid buttons now contain images -->
     <main class="kiosk-grid">

@@ -2,15 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Custom Label</title>
     <!-- Link to the external stylesheet -->
     <link rel="stylesheet" href="/site.css">
+    <link rel="stylesheet" href="/nav.css">
 </head>
 <body>
+<script src="/nav.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', ()=> {
+        window.renderSiteHeader();
+    });
+</script>
 
     <div class="container">
-        <h1>Custom Label</h1>
         <form id="printForm">
             <div class="form-grid">
                 <!-- Main Message -->
@@ -21,11 +27,11 @@
 
                 <!-- Border Messages -->
                 <div class="form-group">
-                    <label for="border_message">Top/Bottom Border</label>
+                    <label for="border_message">Top/Bottom Border Text</label>
                     <input type="text" id="border_message" name="border_message">
                 </div>
                 <div class="form-group">
-                    <label for="side_border">Side Border</label>
+                    <label for="side_border">Side Border Text</label>
                     <input type="text" id="side_border" name="side_border">
                 </div>
 
@@ -60,7 +66,7 @@
                 <!-- Boolean Flags -->
                 <div class="form-group checkbox-group">
                     <input type="checkbox" id="show_date" name="show_date">
-                    <label for="show_date">Show Date</label>
+                    <label for="show_date">Include Today's Date</label>
                 </div>
                 <div class="form-group checkbox-group">
                     <input type="checkbox" id="preview_only" name="preview_only" checked>
@@ -73,7 +79,6 @@
 
         <div id="statusMessage"></div>
         <div id="previewContainer">
-            <h2>Preview</h2>
             <img id="previewImage" src="" alt="Label Preview">
         </div>
     </div>

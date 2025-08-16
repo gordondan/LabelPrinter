@@ -5,22 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Label Printer</title>
     <link rel="stylesheet" href="/link-grid.css" />
+    <link rel="stylesheet" href="/nav.css" />
 </head>
 <body>
 
     <div id="mount"></div>
 
+    <script src="/nav.js"></script>
     <script src="/link-grid.js"></script>
     <script>
         // Configure the homepage link tiles here or fetch from an API/config.
         // Each item: { href, image_url, title }
         const HOME_LINKS = [
-            { href: '/custom-label.html', image_url: '/uploads/html_icon.png', title: 'Custom Label' },
-            { href: '/recent.html', image_url: '/label_preview.png', title: 'Recent Labels' },
-            { href: '/kiosk-buttons.html', image_url: '/images/kiosk/image1.png', title: 'Kiosk' }
+            { href: '/custom-label.html', image_url: '/images/Today-Label.png', title: 'Today Label' },
+            { href: '/custom-label.html', image_url: '/images/Custom-Label.png', title: 'Custom Label' },
+            { href: '/recent.html', image_url: '/images/Recent-Labels.png', title: 'Recent Labels' }
         ];
 
         document.addEventListener('DOMContentLoaded', async () => {
+            window.renderSiteHeader();
             const mount = document.getElementById('mount');
             const grid = window.createLinkGrid({
                 mount,

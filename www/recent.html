@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Recent Labels</title>
   <link rel="stylesheet" href="/link-grid.css" />
+  <link rel="stylesheet" href="/nav.css" />
 </head>
 <body>
 
+  <script src="/nav.js"></script>
   <script src="/link-grid.js"></script>
   <script>
     async function getRecentItems(){
@@ -42,6 +44,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
+      window.renderSiteHeader();
       const mount = document.body; // link-grid creates its own centered wrapper
       const grid = window.createLinkGrid({
         mount,

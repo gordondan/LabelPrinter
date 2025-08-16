@@ -1,0 +1,59 @@
+:root { --nav-height: 64px; --nav-bg: #ffffffcc; --nav-fg:#222; --nav-accent:#4169E1; }
+
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: var(--nav-height);
+  backdrop-filter: saturate(180%) blur(10px);
+  background: var(--nav-bg);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  width: 100%;
+}
+
+.site-header .inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 100%;
+}
+
+.site-brand {
+  font-weight: 700;
+  color: var(--nav-fg);
+  text-decoration: none;
+  letter-spacing: .2px;
+}
+
+/* Ensure header inherits the page font */
+.site-header, .site-header * { font-family: inherit; }
+
+/* Optional: pages may add this class to offset content below the fixed header */
+body.has-site-header { padding-top: var(--nav-height); }
+
+.site-nav {
+  display: flex;
+  gap: 16px;
+}
+
+.site-nav a {
+  color: var(--nav-fg);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.site-nav a:hover {
+  background: rgba(65,105,225,0.08);
+}
+
+.site-nav a.active {
+  color: var(--nav-accent);
+  background: rgba(65,105,225,0.12);
+}
