@@ -29,5 +29,19 @@ def create_app() -> Flask:
     from .routes.api import api_bp
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp, url_prefix='')
+    # Optional: start GPIO listener on Raspberry Pi if enabled
+    try:
+        from .services.gpio_listener import GPIOListener
+        gpio = GPIOListener(logger=app.logger)
+        gpio.start()
+
+        @app.teardown_appcontext
+        def _shutdown_gpio(exc):  # noqa: ANN001
+            try:
+                gpio.stop()
+            except Exception:
+                pass
+    except Exception:
+        app.logger.info("GPIO listener not started.")
 
     return app

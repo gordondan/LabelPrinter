@@ -65,6 +65,46 @@
                 }
             });
             await grid.load();
+
+            // Subscribe to server-sent events to handle GPIO-triggered actions
+            try {
+                const es = new EventSource('/api/events');
+                es.onmessage = async (ev) => {
+                    try {
+                        const data = JSON.parse(ev.data || '{}');
+                        if (data && data.type === 'print-today') {
+                            const item = HOME_LINKS.find(x => x.action === 'print-today');
+                            if (!item) return;
+                            // Reuse the exact print-today flow
+                            try {
+                                grid.setBusy(item, true);
+                                grid.setStatus('Preparing today\'s label…');
+                                const payload = { show_date: true, border: true, count: 1 };
+                                const prevRes = await fetch('/api/pi-label/preview', {
+                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(payload)
+                                });
+                                const prevBody = await prevRes.json().catch(()=>({error:'Invalid response'}));
+                                if (!prevRes.ok || !prevBody.preview_path) {
+                                    throw new Error((prevBody && (prevBody.error || (prevBody.errors && prevBody.errors.join(', ')))) || 'Preview failed');
+                                }
+                                grid.setStatus('Printing today\'s date…');
+                                const printRes = await fetch('/api/pi-label/print', {
+                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ path: prevBody.preview_path })
+                                });
+                                const printBody = await printRes.json().catch(()=>({error:'Invalid response'}));
+                                if (!printRes.ok) throw new Error(printBody.errors ? printBody.errors.join(', ') : (printBody.error || 'Print failed'));
+                                grid.setStatus('Label sent to printer.');
+                            } catch (e) {
+                                grid.setStatus('Error: ' + (e.message || e));
+                            } finally {
+                                grid.setBusy(item, false);
+                            }
+                        }
+                    } catch {}
+                };
+            } catch {}
         });
     </script>
 

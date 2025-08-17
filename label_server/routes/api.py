@@ -23,8 +23,26 @@ from ..services.util import (
     find_existing_template_match,
 )
 from ..services.printing import print_png_via_ble
+from ..services.events import bus
+from flask import stream_with_context
 
 api_bp = Blueprint('api', __name__)
+@api_bp.get('/api/events')
+def sse_events():
+    q = bus.subscribe()
+    def gen():
+        try:
+            while True:
+                data = q.get()
+                yield f"data: {data}\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            bus.unsubscribe(q)
+    resp = Response(stream_with_context(gen()), mimetype='text/event-stream')
+    resp.headers['Cache-Control'] = 'no-cache'
+    resp.headers['X-Accel-Buffering'] = 'no'
+    return resp
 
 
 @api_bp.get('/api/pi-label/options')
