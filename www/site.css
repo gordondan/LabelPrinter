@@ -103,6 +103,7 @@ input[type="date"] {
 .submit-btn:disabled {
     background-color: #a0cffa;
     cursor: not-allowed;
+    opacity: 0.85;
 }
 
 #statusMessage {
@@ -111,7 +112,9 @@ input[type="date"] {
     border-radius: 6px;
     text-align: center;
     font-weight: 500;
-    display: none; /* Hidden by default */
+    min-height: 3rem; /* Reserve space to prevent layout shift */
+    display: block; /* Keep element in the flow */
+    visibility: hidden; /* Hidden unless showing a message */
 }
 
 .status-success {

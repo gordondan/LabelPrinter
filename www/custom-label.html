@@ -187,7 +187,12 @@
 
     async function generatePreview() {
         try {
-            updateStatus('Generating preview…', 'success');
+            // Show generating status and disable printing while we wait
+            statusMessage.className = '';
+            statusMessage.textContent = 'Generating preview…';
+            statusMessage.style.visibility = 'visible';
+            previewReady = false;
+            updatePrintButtonState();
             // Ensure image is uploaded if present
             await ensureImageUploaded();
             const payload = buildPayload({ previewOnly: true });
@@ -208,12 +213,15 @@
             previewImage.style.display = 'block';
             previewReady = true;
             lastPreviewPayload = payload;
-            // Don't show a redundant "Preview ready" message; preview image + enabled button are enough
+            // Hide the status message; preview image + enabled button are cues
+            statusMessage.style.visibility = 'hidden';
         } catch (err) {
             previewReady = false;
             lastPreviewPayload = null;
             lastPreviewPath = null;
-            updateStatus(`Error: ${err.message}`, 'error');
+            statusMessage.className = 'status-error';
+            statusMessage.textContent = `Error: ${err.message}`;
+            statusMessage.style.visibility = 'visible';
             previewImage.style.display = 'none';
         } finally {
             updatePrintButtonState();
@@ -311,8 +319,8 @@
 
     function updateStatus(message, type) {
         statusMessage.textContent = message;
-        statusMessage.className = `status-${type}`;
-        statusMessage.style.display = 'block';
+        statusMessage.className = type ? `status-${type}` : '';
+        statusMessage.style.visibility = message ? 'visible' : 'hidden';
     }
 
     function resetButton() {
