@@ -56,7 +56,7 @@
       }catch{}
     }
     refreshJobs();
-    setInterval(refreshJobs, 2000);
+  setInterval(refreshJobs, 3000);
   }
 
   window.renderSiteHeader = renderHeader;

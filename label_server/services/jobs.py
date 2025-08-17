@@ -29,7 +29,7 @@ class Job:
 
 
 class JobQueue:
-    def __init__(self, max_concurrent: int = 1):
+    def __init__(self, max_concurrent: int = 1, on_activity=None):
         self._jobs: Dict[str, Job] = {}
         self._q: Queue = Queue()
         self._lock = threading.Lock()
@@ -38,6 +38,7 @@ class JobQueue:
         # Limit concurrency; default 1 ensures jobs run one at a time
         self._max_concurrent = max(1, int(max_concurrent))
         self._active = 0
+        self._on_activity = on_activity  # callable(delta:int) or None
 
     def start(self):
         if self._worker and self._worker.is_alive():
@@ -61,6 +62,11 @@ class JobQueue:
         with self._lock:
             self._jobs[jid] = job
         self._q.put((jid, job, fn))
+        try:
+            if callable(self._on_activity):
+                self._on_activity(+1)
+        except Exception:
+            pass
         return job
 
     def get(self, job_id: str) -> Optional[Job]:
@@ -112,6 +118,11 @@ class JobQueue:
                     job.finished_at = time.time()
                 finally:
                     self._q.task_done()
+                    try:
+                        if callable(self._on_activity):
+                            self._on_activity(-1)
+                    except Exception:
+                        pass
 
             t = threading.Thread(target=_exec, args=(job, fn), name=f"job-{jid[:8]}", daemon=True)
             t.start()

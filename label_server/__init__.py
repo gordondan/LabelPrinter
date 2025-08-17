@@ -33,7 +33,22 @@ def create_app() -> Flask:
     # Start background job queue (single-worker to avoid memory pressure)
     try:
         from .services.jobs import JobQueue
-        app.job_queue = JobQueue(max_concurrent=1)  # type: ignore[attr-defined]
+        # Create gpio_manager first so we can wire activity callback
+        try:
+            from .services.gpio_manager import GPIOManager
+            app.gpio_manager = getattr(app, 'gpio_manager', GPIOManager(logger=app.logger))  # type: ignore[attr-defined]
+        except Exception:
+            app.gpio_manager = None  # type: ignore[attr-defined]
+
+        def _on_activity(delta: int):
+            gm = getattr(app, 'gpio_manager', None)
+            if gm:
+                try:
+                    gm.notify_job_activity(delta)
+                except Exception:
+                    pass
+
+        app.job_queue = JobQueue(max_concurrent=1, on_activity=_on_activity)  # type: ignore[attr-defined]
         app.job_queue.start()       # type: ignore[attr-defined]
     except Exception as e:
         app.logger.warning("Job queue not started: %s", e)
@@ -50,6 +65,11 @@ def create_app() -> Flask:
         pass
 
     # GPIO listener moved to a feature module and disabled by default.
-    # To enable, a separate bootstrap can import services.gpio_listener and start it conditionally.
+    # To enable, we create a manager that will start/stop the listener based on job activity and config.
+    try:
+        from .services.gpio_manager import GPIOManager
+        app.gpio_manager = GPIOManager(logger=app.logger)  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
     return app
