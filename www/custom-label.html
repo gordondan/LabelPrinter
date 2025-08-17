@@ -74,7 +74,7 @@
                 </div>
             </div>
 
-            <button type="submit" id="submitButton" class="submit-btn">Generate Label</button>
+            <button type="submit" id="submitButton" class="submit-btn" disabled>Print Label</button>
         </form>
 
         <div id="statusMessage"></div>
@@ -98,6 +98,89 @@
     const uploadPreviewImage = document.getElementById('uploadPreviewImage');
     const removeImageButton = document.getElementById('removeImageButton');
 
+    // --- STATE ---
+    let debounceTimer = null;
+    let previewReady = false;
+    let lastPreviewPayload = null; // The payload used to create the preview
+    let uploadedImagePath = null;
+    let uploadedImageSig = null; // Track file identity to avoid re-uploads (name+size+mtime)
+
+    function updatePrintButtonState() {
+        const previewOnly = document.getElementById('preview_only').checked;
+        submitButton.disabled = !(previewReady && !previewOnly);
+    }
+
+    function schedulePreviewDebounced() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(generatePreview, 3000);
+    }
+
+    function fileSignature(file) {
+        return file ? `${file.name}:${file.size}:${file.lastModified}` : null;
+    }
+
+    async function ensureImageUploaded() {
+        const file = imageUploadInput.files && imageUploadInput.files[0];
+        const sig = fileSignature(file);
+        if (!file) { uploadedImagePath = null; uploadedImageSig = null; return null; }
+        if (uploadedImageSig === sig && uploadedImagePath) return uploadedImagePath;
+        const imageUploadData = new FormData();
+        imageUploadData.append('imageFile', file);
+        const uploadResponse = await fetch('/api/upload', { method: 'POST', body: imageUploadData });
+        const uploadResult = await uploadResponse.json().catch(() => ({ error: 'Invalid response' }));
+        if (!uploadResponse.ok) throw new Error(uploadResult.error || 'Image upload failed.');
+        uploadedImagePath = uploadResult.filePath;
+        uploadedImageSig = sig;
+        return uploadedImagePath;
+    }
+
+    function buildPayload({ previewOnly }) {
+        const printPayload = {};
+        const formData = new FormData(printForm);
+        for (const [key, value] of formData.entries()) {
+            if (key === 'imageFile') continue;
+            if (key === 'show_date' || key === 'preview_only') {
+                if (formData.get(key)) printPayload[key] = true;
+                continue;
+            }
+            if (typeof value === 'string' && value.trim() !== '') {
+                printPayload[key] = value;
+            }
+        }
+        // Force preview_only flag as requested
+        if (previewOnly) printPayload.preview_only = true; else delete printPayload.preview_only;
+        if (uploadedImagePath) printPayload.image = uploadedImagePath;
+        return printPayload;
+    }
+
+    async function generatePreview() {
+        try {
+            updateStatus('Generating preview…', 'success');
+            // Ensure image is uploaded if present
+            await ensureImageUploaded();
+            const payload = buildPayload({ previewOnly: true });
+            const res = await fetch('/api/pi-label/print', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const body = await res.json().catch(() => ({ error: 'Invalid response' }));
+            if (!res.ok) throw new Error(body.errors ? body.errors.join(', ') : body.error || 'Preview failed.');
+            if (!body.preview_url) throw new Error('No preview returned.');
+            previewImage.src = `${body.preview_url}&t=${Date.now()}`;
+            previewImage.style.display = 'block';
+            previewReady = true;
+            lastPreviewPayload = payload;
+            updateStatus('Preview ready', 'success');
+        } catch (err) {
+            previewReady = false;
+            lastPreviewPayload = null;
+            updateStatus(`Error: ${err.message}`, 'error');
+            previewImage.style.display = 'none';
+        } finally {
+            updatePrintButtonState();
+        }
+    }
+
     // --- EVENT LISTENER FOR FILE SELECTION ---
     imageUploadInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
@@ -115,6 +198,8 @@
             };
             reader.readAsDataURL(file);
         }
+        // New image affects preview; schedule preview generation
+        schedulePreviewDebounced();
     });
 
     // --- EVENT LISTENER FOR REMOVE BUTTON ---
@@ -130,78 +215,58 @@
         fileNameDisplay.textContent = 'No file chosen';
     });
 
-    // --- EVENT LISTENER FOR FORM SUBMISSION ---
+    // --- AUTOPREVIEW ON INPUT CHANGES ---
+    // Track text/number/date inputs for debounced preview
+    printForm.addEventListener('input', (e) => {
+        const target = e.target;
+        if (!target || !(target instanceof HTMLElement)) return;
+        const tag = target.tagName.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+            schedulePreviewDebounced();
+        }
+    });
+
+    // Immediate state reaction for preview_only checkbox
+    document.getElementById('preview_only').addEventListener('change', updatePrintButtonState);
+
+    // --- EVENT LISTENER FOR PRINT SUBMISSION ---
     printForm.addEventListener('submit', async (event) => {
-        event.preventDefault(); 
-        
+        event.preventDefault();
+        if (!previewReady) { updateStatus('Generate a preview first.', 'error'); return; }
+        if (document.getElementById('preview_only').checked) { updateStatus('Uncheck Preview Only to print.', 'error'); return; }
+
         submitButton.disabled = true;
-        submitButton.textContent = 'Processing...';
-        statusMessage.style.display = 'none';
-        previewImage.style.display = 'none';
-
-        let imagePathOnServer = null;
-        const imageFile = imageUploadInput.files[0];
-
-        // STEP 1: UPLOAD IMAGE (if one is selected)
-        if (imageFile) {
-            const imageUploadData = new FormData();
-            imageUploadData.append('imageFile', imageFile);
-            try {
-                const uploadResponse = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: imageUploadData
-                });
-                const uploadResult = await uploadResponse.json();
-                if (!uploadResponse.ok) throw new Error(uploadResult.error || 'Image upload failed.');
-                imagePathOnServer = uploadResult.filePath;
-                updateStatus(`Image uploaded: ${imagePathOnServer}`, 'success');
-            } catch (error) {
-                updateStatus(`Error: ${error.message}`, 'error');
-                resetButton();
-                return;
-            }
-        }
-
-        // STEP 2: GATHER ALL FORM DATA AND SEND PRINT COMMAND
-        const printPayload = {};
-        const formData = new FormData(printForm);
-        
-        for (const [key, value] of formData.entries()) {
-            if (value) {
-                if (key === 'show_date' || key === 'preview_only') {
-                    printPayload[key] = true;
-                } else if (typeof value === 'string' && value.trim() !== '') {
-                    printPayload[key] = value;
-                }
-            }
-        }
-
-        if (imagePathOnServer) {
-            printPayload.image = imagePathOnServer;
-        }
-        delete printPayload.imageFile;
+        const originalText = submitButton.textContent;
+        submitButton.textContent = 'Printing…';
 
         try {
+            // Reuse last preview payload but ensure preview_only is false
+            const payload = { ...(lastPreviewPayload || buildPayload({ previewOnly: false })) };
+            delete payload.preview_only;
+            // Ensure image path is included if available
+            if (uploadedImagePath) payload.image = uploadedImagePath;
+
             const printResponse = await fetch('/api/pi-label/print', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(printPayload)
+                body: JSON.stringify(payload)
             });
-            const printResult = await printResponse.json();
+            const printResult = await printResponse.json().catch(() => ({ error: 'Invalid response' }));
             if (!printResponse.ok) {
                 const errorMsg = printResult.errors ? printResult.errors.join(', ') : printResult.error;
                 throw new Error(errorMsg || 'Print command failed.');
             }
-            updateStatus('Label generated successfully!', 'success');
-            
+            updateStatus('Label sent to printer.', 'success');
+            // Optionally refresh preview if provided
             if (printResult.preview_url) {
-                previewImage.src = `${printResult.preview_url}&t=${new Date().getTime()}`;
+                previewImage.src = `${printResult.preview_url}&t=${Date.now()}`;
                 previewImage.style.display = 'block';
             }
         } catch (error) {
             updateStatus(`Error: ${error.message}`, 'error');
         } finally {
-            resetButton();
+            submitButton.textContent = originalText;
+            updatePrintButtonState();
         }
     });
 
@@ -212,9 +277,12 @@
     }
 
     function resetButton() {
-        submitButton.disabled = false;
-        submitButton.textContent = 'Generate Label';
+        // Not used in new flow; keep for compatibility
+        updatePrintButtonState();
     }
+
+    // Kick off an initial debounced preview on load (optional)
+    schedulePreviewDebounced();
 </script>
 
 </body>
