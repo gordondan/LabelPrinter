@@ -697,7 +697,7 @@ def reconnect_bluetooth_device(device_name):
     No manual reconnect is needed; a new connection will be attempted each print.
     """
     
-def generate_label_image(date_str, date_obj, config, printer_config, message=None, border_message=None, side_border=None, show_date=False, image_path=None, logger=None):
+def generate_label_image(date_str, date_obj, config, printer_config, message=None, border_message=None, side_border=None, show_date=False, image_path=None, logger=None, border_enabled=True):
     """Generate a label image with dates and/or message."""
     # Create image based on printer-specific settings
     width_px = int(printer_config['label_width_in'] * printer_config['dpi'])
@@ -745,8 +745,9 @@ def generate_label_image(date_str, date_obj, config, printer_config, message=Non
     if show_side_border:
         draw_side_border_message(image, draw, side_border, config, layout, width_px, height_px)
     
-    # Draw border
-    draw_border(draw, width_px, height_px)
+    # Draw border if enabled
+    if border_enabled:
+        draw_border(draw, width_px, height_px)
     
     # Debug output
     print(f"\n=== Debug Info ===")
@@ -923,7 +924,14 @@ if __name__ == "__main__":
     logger.log_label_generation(date_str, args.message, args.border_message, not args.show_date, args.count)
     
     _t0 = time.perf_counter()
-    label_img = generate_label_image(date_str, date_obj, config, printer_config, args.message, args.border_message, args.side_border, args.show_date, args.image, logger)
+    # Determine border enablement from environment (set by server); defaults to enabled
+    border_enabled = os.environ.get('LABEL_BORDER_ENABLED', '1') != '0'
+    label_img = generate_label_image(
+        date_str, date_obj, config, printer_config,
+        args.message, args.border_message, args.side_border,
+        args.show_date, args.image, logger,
+        border_enabled=border_enabled
+    )
     _profile['image_generation'] = time.perf_counter() - _t0
     print(f"Label image generated for: {date_str}")
     logger.log_success("Label image generated", f"Date: {date_str}, Dimensions: {label_img.size}")

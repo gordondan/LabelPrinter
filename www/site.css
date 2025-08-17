@@ -117,7 +117,32 @@ input[type="date"] {
     visibility: hidden; /* Hidden unless showing a message */
 }
 
+/* Loading spinner next to the status text when generating preview */
+#statusMessage.loading::after {
+    content: "";
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-left: 8px;
+    border-radius: 50%;
+    border: 2px solid rgba(21, 87, 36, 0.3); /* light green tone */
+    border-top-color: #155724; /* darker green */
+    animation: spin 0.9s linear infinite;
+    vertical-align: text-bottom;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 .status-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+/* Generating preview uses success styling for a friendly green background */
+#statusMessage.loading {
     background-color: #d4edda;
     color: #155724;
     border: 1px solid #c3e6cb;
@@ -138,4 +163,10 @@ input[type="date"] {
     max-width: 100%;
     border: 1px solid #ddd;
     display: none;
+}
+
+/* Dim the preview while generating */
+#previewContainer.loading #previewImage {
+    opacity: 0.2;
+    transition: opacity 0.2s ease-in-out;
 }

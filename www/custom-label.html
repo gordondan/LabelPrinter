@@ -78,13 +78,13 @@
                 </div>
             </div>
 
+            <div id="statusMessage"></div>
+            <div id="previewContainer">
+                <img id="previewImage" src="" alt="Label Preview">
+            </div>
+
             <button type="submit" id="submitButton" class="submit-btn" disabled>Print Label</button>
         </form>
-
-        <div id="statusMessage"></div>
-        <div id="previewContainer">
-            <img id="previewImage" src="" alt="Label Preview">
-        </div>
     </div>
 
 <script>
@@ -116,7 +116,7 @@
 
     function schedulePreviewDebounced() {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(generatePreview, 3000);
+        debounceTimer = setTimeout(generatePreview, 1500);
     }
 
     function fileSignature(file) {
@@ -153,14 +153,13 @@
         const formData = new FormData(printForm);
         for (const [key, value] of formData.entries()) {
             if (key === 'imageFile') continue;
-            if (key === 'show_date' || key === 'border') {
-                if (formData.get(key)) printPayload[key] = true;
-                continue;
-            }
             if (typeof value === 'string' && value.trim() !== '') {
                 printPayload[key] = key === 'date' ? normalizeDateString(value.trim()) : value.trim();
             }
         }
+        // Always send boolean flags explicitly so server/template reuse can distinguish false vs missing
+        printPayload.show_date = formData.has('show_date');
+        printPayload.border = formData.has('border');
         // preview-only flag removed; server infers preview by endpoint
         if (uploadedImagePath) printPayload.image = uploadedImagePath;
         return printPayload;
@@ -188,10 +187,11 @@
     async function generatePreview() {
         try {
             // Show generating status and disable printing while we wait
-            statusMessage.className = '';
+            statusMessage.className = 'loading';
             statusMessage.textContent = 'Generating preview…';
             statusMessage.style.visibility = 'visible';
             previewReady = false;
+            document.getElementById('previewContainer').classList.add('loading');
             updatePrintButtonState();
             // Ensure image is uploaded if present
             await ensureImageUploaded();
@@ -215,6 +215,8 @@
             lastPreviewPayload = payload;
             // Hide the status message; preview image + enabled button are cues
             statusMessage.style.visibility = 'hidden';
+            statusMessage.className = '';
+            document.getElementById('previewContainer').classList.remove('loading');
         } catch (err) {
             previewReady = false;
             lastPreviewPayload = null;
@@ -224,6 +226,7 @@
             statusMessage.style.visibility = 'visible';
             previewImage.style.display = 'none';
         } finally {
+            document.getElementById('previewContainer').classList.remove('loading');
             updatePrintButtonState();
         }
     }
@@ -263,18 +266,21 @@
     });
 
     // --- AUTOPREVIEW ON INPUT CHANGES ---
-    // Track text/number/date inputs for debounced preview
+    // Track text/number inputs for debounced preview; skip immediate toggles and date
     printForm.addEventListener('input', (e) => {
         const target = e.target;
         if (!target || !(target instanceof HTMLElement)) return;
         const tag = target.tagName.toLowerCase();
+        if (['border','show_date','date'].includes(target.id)) return;
         if (tag === 'input' || tag === 'textarea' || tag === 'select') {
             schedulePreviewDebounced();
         }
     });
 
-    // Border toggling affects preview
-    document.getElementById('border').addEventListener('change', schedulePreviewDebounced);
+    // Trigger preview immediately on these toggles (no debounce)
+    document.getElementById('border').addEventListener('change', generatePreview);
+    document.getElementById('show_date').addEventListener('change', generatePreview);
+    document.getElementById('date').addEventListener('change', generatePreview);
 
     // --- EVENT LISTENER FOR PRINT SUBMISSION ---
     printForm.addEventListener('submit', async (event) => {
