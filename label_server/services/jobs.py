@@ -29,12 +29,15 @@ class Job:
 
 
 class JobQueue:
-    def __init__(self):
+    def __init__(self, max_concurrent: int = 1):
         self._jobs: Dict[str, Job] = {}
         self._q: Queue = Queue()
         self._lock = threading.Lock()
         self._worker: Optional[threading.Thread] = None
         self._stop = threading.Event()
+        # Limit concurrency; default 1 ensures jobs run one at a time
+        self._max_concurrent = max(1, int(max_concurrent))
+        self._active = 0
 
     def start(self):
         if self._worker and self._worker.is_alive():
@@ -77,7 +80,14 @@ class JobQueue:
 
     # --- internal ---
     def _run(self):
+        workers: List[threading.Thread] = []
         while not self._stop.is_set():
+            # Cleanup finished workers
+            workers = [w for w in workers if w.is_alive()]
+            self._active = len(workers)
+            if self._active >= self._max_concurrent:
+                time.sleep(0.05)
+                continue
             try:
                 item = self._q.get(timeout=0.5)
             except Empty:
@@ -87,16 +97,22 @@ class JobQueue:
             jid, job, fn = item
             if not job or not fn:
                 continue
-            try:
-                job.status = JobStatus.RUNNING
-                job.started_at = time.time()
-                res = fn()
-                job.result = res
-                job.status = JobStatus.DONE
-                job.finished_at = time.time()
-            except Exception as e:
-                job.error = str(e)
-                job.status = JobStatus.ERROR
-                job.finished_at = time.time()
-            finally:
-                self._q.task_done()
+
+            def _exec(job: Job, fn: Callable[[], Any]):
+                try:
+                    job.status = JobStatus.RUNNING
+                    job.started_at = time.time()
+                    res = fn()
+                    job.result = res
+                    job.status = JobStatus.DONE
+                    job.finished_at = time.time()
+                except Exception as e:
+                    job.error = str(e)
+                    job.status = JobStatus.ERROR
+                    job.finished_at = time.time()
+                finally:
+                    self._q.task_done()
+
+            t = threading.Thread(target=_exec, args=(job, fn), name=f"job-{jid[:8]}", daemon=True)
+            t.start()
+            workers.append(t)

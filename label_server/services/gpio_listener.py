@@ -101,7 +101,11 @@ class GPIOListener:
         finally:
             with self._thread_guard:
                 self._started = False
-            self.logger.info("GPIO listener stopped.")
+            # Reduce log noise
+            try:
+                self.logger.debug("GPIO listener stopped.")
+            except Exception:
+                pass
 
     # --- Internal ---
     def _on_edge(self, channel: int):

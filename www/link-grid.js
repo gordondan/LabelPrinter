@@ -97,11 +97,12 @@
 
       slice.forEach((it, localIndex) => {
         const globalIndex = start + localIndex;
-        const a = document.createElement('a');
+  const a = document.createElement('a');
         a.href = it.href || '#';
         a.className = 'lg-button';
         a.dataset.index = String(globalIndex);
         a.tabIndex = 0;
+  if (it.disabled) a.classList.add('is-disabled');
 
         const img = document.createElement('img');
         img.src = it.image_url;
@@ -134,6 +135,7 @@
         }
 
   a.addEventListener('click', (e)=>{
+          if (it.disabled) { e.preventDefault(); return; }
           // If href provided, allow navigation; otherwise intercept and call onEnter
           if (!it.href){ e.preventDefault(); }
           if (typeof opts.onEnter === 'function') opts.onEnter(it);
@@ -183,6 +185,7 @@
       if (key === 'Enter'){
         event.preventDefault();
         const item = state.items[start + 0];
+        if (item && item.disabled) return;
         if (!item) return;
         if (typeof opts.onEnter === 'function') opts.onEnter(item);
         return;
@@ -223,6 +226,7 @@
       if (localIndex !== undefined){
         event.preventDefault();
         const item = state.items[start + localIndex];
+        if (item && item.disabled) return;
         if (!item) return;
         if (typeof opts.onEnter === 'function') opts.onEnter(item);
       }

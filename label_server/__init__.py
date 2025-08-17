@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from flask import Flask
+import threading
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # project root
 
@@ -29,26 +30,26 @@ def create_app() -> Flask:
     from .routes.api import api_bp
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp, url_prefix='')
-    # Start background job queue
+    # Start background job queue (single-worker to avoid memory pressure)
     try:
         from .services.jobs import JobQueue
-        app.job_queue = JobQueue()  # type: ignore[attr-defined]
+        app.job_queue = JobQueue(max_concurrent=1)  # type: ignore[attr-defined]
         app.job_queue.start()       # type: ignore[attr-defined]
     except Exception as e:
         app.logger.warning("Job queue not started: %s", e)
-    # Optional: start GPIO listener on Raspberry Pi if enabled
+    # Pre-generate today's label in the background so the home button can use it without triggering generation
     try:
-        from .services.gpio_listener import GPIOListener
-        gpio = GPIOListener(logger=app.logger)
-        gpio.start()
-
-        @app.teardown_appcontext
-        def _shutdown_gpio(exc):  # noqa: ANN001
+        from .services.today_label import ensure_today_label
+        def _bg_ensure():
             try:
-                gpio.stop()
+                ensure_today_label(logger=app.logger, force=False)
             except Exception:
                 pass
+        threading.Thread(target=_bg_ensure, name='ensure-today', daemon=True).start()
     except Exception:
-        app.logger.info("GPIO listener not started.")
+        pass
+
+    # GPIO listener moved to a feature module and disabled by default.
+    # To enable, a separate bootstrap can import services.gpio_listener and start it conditionally.
 
     return app

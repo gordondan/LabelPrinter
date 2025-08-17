@@ -28,6 +28,11 @@
                     <input type="date" id="msgDatePicker" style="display:none;" aria-hidden="true">
                 </div>
 
+                <!-- Quick access print button near the top -->
+                <div class="form-group full-width" style="margin: 0.25rem 0 0.75rem;">
+                    <button type="submit" id="topSubmitButton" class="submit-btn" disabled>Print Label <span class="nav-hotkey">(p)</span></button>
+                </div>
+
                 <!-- Quick toggles visible on load -->
                 <div class="form-group full-width" style="display:flex; flex-direction:row; gap:1rem; align-items:center; flex-wrap:nowrap;">
                     <label style="display:inline-flex; align-items:center; gap:0.5rem; white-space:nowrap; margin:0;">
@@ -101,6 +106,7 @@
     // --- FORM ELEMENTS ---
     const printForm = document.getElementById('printForm');
     const submitButton = document.getElementById('submitButton');
+    const topSubmitButton = document.getElementById('topSubmitButton');
     const statusMessage = document.getElementById('statusMessage');
     const previewImage = document.getElementById('previewImage');
     
@@ -121,7 +127,8 @@
     let uploadedImageSig = null; // Track file identity to avoid re-uploads (name+size+mtime)
 
     function updatePrintButtonState() {
-        submitButton.disabled = !previewReady;
+    submitButton.disabled = !previewReady;
+    if (topSubmitButton) topSubmitButton.disabled = !previewReady;
     }
 
     function schedulePreviewDebounced() {
@@ -346,6 +353,11 @@
         submitButton.disabled = true;
         const originalText = submitButton.textContent;
         submitButton.textContent = 'Printing…';
+        if (topSubmitButton) {
+            topSubmitButton.disabled = true;
+            var topOriginalText = topSubmitButton.textContent;
+            topSubmitButton.textContent = 'Printing…';
+        }
     // Show spinner while printing and dim the preview
     statusMessage.className = 'loading';
     statusMessage.textContent = 'Printing…';
@@ -384,6 +396,7 @@
             // Clear spinner/dimming regardless of outcome
             statusMessage.className = '';
             document.getElementById('previewContainer').classList.remove('loading');
+            if (topSubmitButton) topSubmitButton.textContent = topOriginalText || 'Print Label (p)';
         }
     });
 

@@ -24,6 +24,7 @@ from ..services.util import (
 )
 from ..services.printing import print_png_via_ble
 from ..services.jobs import JobStatus
+from ..services.today_label import ensure_today_label, get_today_status
 from ..services.events import bus
 from flask import stream_with_context
 
@@ -475,3 +476,23 @@ def api_jobs_counts():
     if not jq:
         return jsonify({'queued': 0, 'running': 0, 'total_active': 0})
     return jsonify(jq.counts())
+
+
+@api_bp.get('/api/today/status')
+def api_today_status():
+    return jsonify(get_today_status())
+
+
+@api_bp.post('/api/today/ensure')
+def api_today_ensure():
+    force = bool((request.get_json(silent=True) or {}).get('force'))
+    # Run in background via job queue to avoid blocking UI
+    jq = getattr(current_app, 'job_queue', None)
+    if jq:
+        def _job():
+            ok, rel = ensure_today_label(logger=current_app.logger, force=force)
+            return {'ok': ok, 'rel_path': rel}
+        job = jq.enqueue('ensure-today', _job, payload={'force': force})
+        return jsonify({'queued': True, 'job_id': job.id}), 202
+    ok, rel = ensure_today_label(logger=current_app.logger, force=force)
+    return jsonify({'ok': ok, 'rel_path': rel})

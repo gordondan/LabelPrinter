@@ -20,7 +20,7 @@ html, body {
 /* Grid of links */
 .lg-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 2rem;
   padding: 2rem;
   max-width: 1200px;
@@ -94,6 +94,12 @@ html, body {
 
 /* Click feedback */
 .lg-button:active { filter: brightness(0.9); }
+
+/* Disabled state */
+.lg-button.is-disabled {
+  filter: grayscale(0.5) brightness(0.85);
+  cursor: not-allowed;
+}
 
 /* Busy overlay for printing */
 .lg-button.is-busy::after {
