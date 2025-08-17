@@ -93,7 +93,7 @@
                 <img id="previewImage" src="" alt="Label Preview">
             </div>
 
-            <button type="submit" id="submitButton" class="submit-btn" disabled>Print Label</button>
+            <button type="submit" id="submitButton" class="submit-btn" disabled>Print Label <span class="nav-hotkey">(p)</span></button>
         </form>
     </div>
 
@@ -400,6 +400,16 @@
 
     // Kick off an initial debounced preview on load (optional)
     schedulePreviewDebounced();
+
+    // Global hotkey: 'p' to print (when preview is ready and not typing)
+    document.addEventListener('keydown', (ev) => {
+        const t = ev.target;
+        if (t && ((t.tagName === 'INPUT') || (t.tagName === 'TEXTAREA') || (t.isContentEditable))) return;
+        if ((ev.key || '').toLowerCase() !== 'p') return;
+        if (!previewReady) return;
+        ev.preventDefault();
+        submitButton.click();
+    }, { passive: false });
 </script>
 
 </body>

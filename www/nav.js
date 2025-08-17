@@ -12,9 +12,9 @@
       <div class="inner">
         <a class="site-brand" href="/">Label Printer</a>
         <nav class="site-nav">
-          <a href="/" data-nav>Home</a>
-          <a href="/custom-label.html" data-nav>Custom Label</a>
-          <a href="/recent.html" data-nav>Recent</a>
+          <a href="/" data-nav>Home <span class="nav-hotkey">(h)</span></a>
+          <a href="/custom-label.html" data-nav>Custom Label <span class="nav-hotkey">(c)</span></a>
+          <a href="/recent.html" data-nav>Recent <span class="nav-hotkey">(r)</span></a>
         </nav>
       </div>`;
 
@@ -25,6 +25,24 @@
     document.querySelectorAll('[data-nav]').forEach(a => {
       if (isActive(a.getAttribute('href'))) a.classList.add('active');
     });
+
+    // Global hotkeys for top nav
+    const navMap = {
+      'h': '/',
+      'c': '/custom-label.html',
+      'r': '/recent.html',
+    };
+    document.addEventListener('keydown', (ev) => {
+      // Ignore when typing in inputs or editable elements
+      const t = ev.target;
+      if (t && ((t.tagName === 'INPUT') || (t.tagName === 'TEXTAREA') || (t.isContentEditable))) return;
+      if (!ev.key || ev.key.length !== 1) return;
+      const k = ev.key.toLowerCase();
+      const href = navMap[k];
+      if (!href) return;
+      ev.preventDefault();
+      window.location.href = href;
+    }, { passive: false });
   }
 
   window.renderSiteHeader = renderHeader;

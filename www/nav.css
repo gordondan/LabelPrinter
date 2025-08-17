@@ -57,3 +57,9 @@ body.has-site-header { padding-top: var(--nav-height); }
   color: var(--nav-accent);
   background: rgba(65,105,225,0.12);
 }
+
+.nav-hotkey {
+  opacity: 0.8;
+  font-weight: 600;
+  margin-left: 4px;
+}

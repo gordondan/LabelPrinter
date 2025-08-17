@@ -108,13 +108,21 @@
         img.alt = it.title || 'Link';
         a.appendChild(img);
 
-        // Derive a hotkey: explicit it.hotKey/it.hotkey, else default to ordinal (1..9, 0 for 10)
+        // Derive a hotkey: explicit it.hotKey/it.hotkey, else ordinal (1..9, 0 for 10)
         const explicitHK = (it.hotKey || it.hotkey || '').toString().trim();
         let hk = explicitHK ? explicitHK[0] : '';
         if (!hk){
           const ord = localIndex + 1;
           if (ord >= 1 && ord <= 9) hk = String(ord);
           else if (ord === 10) hk = '0';
+        }
+
+        // Title text (if provided)
+        if (it.title){
+          const titleEl = document.createElement('div');
+          titleEl.className = 'lg-title';
+          titleEl.textContent = it.title;
+          a.appendChild(titleEl);
         }
         if (hk){
           const hkLower = hk.toLowerCase();
