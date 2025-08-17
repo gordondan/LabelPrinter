@@ -200,7 +200,8 @@
       get page(){ return state.page; },
       get pageSize(){ return PAGE_SIZE; },
       get cols(){ return COLS; },
-      get rows(){ return ROWS; }
+      get rows(){ return ROWS; },
+      setStatus(msg){ setStatus(msg); }
     };
   }
 

@@ -346,6 +346,11 @@
         submitButton.disabled = true;
         const originalText = submitButton.textContent;
         submitButton.textContent = 'Printing…';
+    // Show spinner while printing and dim the preview
+    statusMessage.className = 'loading';
+    statusMessage.textContent = 'Printing…';
+    statusMessage.style.visibility = 'visible';
+    document.getElementById('previewContainer').classList.add('loading');
 
         try {
             // Prefer printing by preview path if available
@@ -376,6 +381,9 @@
         } finally {
             submitButton.textContent = originalText;
             updatePrintButtonState();
+            // Clear spinner/dimming regardless of outcome
+            statusMessage.className = '';
+            document.getElementById('previewContainer').classList.remove('loading');
         }
     });
 

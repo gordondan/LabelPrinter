@@ -17,7 +17,7 @@
         // Configure the homepage link tiles here or fetch from an API/config.
         // Each item: { href, image_url, title }
         const HOME_LINKS = [
-            { href: '/custom-label.html', image_url: '/images/Today-Label.png', title: 'Today Label' },
+            { image_url: '/images/Today-Label.png', title: 'Today Label', action: 'print-today' },
             { href: '/custom-label.html', image_url: '/images/Custom-Label.png', title: 'Custom Label' },
             { href: '/recent.html', image_url: '/images/Recent-Labels.png', title: 'Recent Labels' }
         ];
@@ -30,7 +30,36 @@
                 getItems: async () => HOME_LINKS,
                 cols: 4,
                 rows: 2,
-                onEnter: (item) => { if (item.href) window.location.href = item.href; }
+                onEnter: async (item) => {
+                    if (item.href) { window.location.href = item.href; return; }
+                    if (item.action === 'print-today') {
+                        try {
+                            grid.setStatus('Preparing today\'s label…');
+                            const payload = { show_date: true, border: true, count: 1 };
+                            // Step 1: generate preview to ensure today\'s date is baked in
+                            const prevRes = await fetch('/api/pi-label/preview', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+                            const prevBody = await prevRes.json().catch(()=>({error:'Invalid response'}));
+                            if (!prevRes.ok || !prevBody.preview_path) {
+                                throw new Error((prevBody && (prevBody.error || (prevBody.errors && prevBody.errors.join(', ')))) || 'Preview failed');
+                            }
+                            // Step 2: ask server to print that exact preview image
+                            grid.setStatus('Printing today\'s date…');
+                            const printRes = await fetch('/api/pi-label/print', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path: prevBody.preview_path })
+                            });
+                            const printBody = await printRes.json().catch(()=>({error:'Invalid response'}));
+                            if (!printRes.ok) throw new Error(printBody.errors ? printBody.errors.join(', ') : (printBody.error || 'Print failed'));
+                            grid.setStatus('Label sent to printer.');
+                        } catch (e) {
+                            grid.setStatus('Error: ' + (e.message || e));
+                        }
+                        return;
+                    }
+                }
             });
             await grid.load();
         });
