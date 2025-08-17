@@ -21,6 +21,9 @@
       selectedIndex: 0,
     };
 
+  // Hotkey -> local index map for current page
+  let hotkeyMap = {};
+
     const wrapper = document.createElement('div');
     wrapper.className = 'lg-page';
 
@@ -86,6 +89,7 @@
   function renderPage(){
       grid.innerHTML = '';
       state.buttons = [];
+      hotkeyMap = {};
 
       const start = pageStartIndex(state.page);
       const end = pageEndIndex(state.page);
@@ -103,6 +107,23 @@
         img.src = it.image_url;
         img.alt = it.title || 'Link';
         a.appendChild(img);
+
+        // Derive a hotkey: explicit it.hotKey/it.hotkey, else default to ordinal (1..9, 0 for 10)
+        const explicitHK = (it.hotKey || it.hotkey || '').toString().trim();
+        let hk = explicitHK ? explicitHK[0] : '';
+        if (!hk){
+          const ord = localIndex + 1;
+          if (ord >= 1 && ord <= 9) hk = String(ord);
+          else if (ord === 10) hk = '0';
+        }
+        if (hk){
+          const hkLower = hk.toLowerCase();
+          if (!(hkLower in hotkeyMap)) hotkeyMap[hkLower] = localIndex;
+          const hkEl = document.createElement('div');
+          hkEl.className = 'lg-hotkey';
+          hkEl.textContent = hk.toUpperCase();
+          a.appendChild(hkEl);
+        }
 
   a.addEventListener('click', (e)=>{
           // If href provided, allow navigation; otherwise intercept and call onEnter
@@ -130,59 +151,73 @@
       renderPage();
     }
 
-    // Keyboard navigation
+    // Keyboard navigation: Arrow keys page only; hotkeys trigger items
     document.addEventListener('keydown', async (event) => {
       const key = event.key;
-      if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(key)) event.preventDefault();
-
       const start = pageStartIndex(state.page);
       const end = pageEndIndex(state.page);
       const localCount = end - start;
-
       if (!localCount) return;
 
-      let newLocal = state.selectedIndex;
-      switch(key){
-        case 'ArrowRight': if ((newLocal + 1) % COLS !== 0) newLocal++; break;
-        case 'ArrowLeft': if (newLocal % COLS !== 0) newLocal--; break;
-        case 'ArrowDown': newLocal += COLS; break;
-        case 'ArrowUp': newLocal -= COLS; break;
-        case 'Enter': {
-          const item = state.items[start + state.selectedIndex];
-          if (item) {
-            if (!item.href) event.preventDefault();
-            if (typeof opts.onEnter === 'function') opts.onEnter(item);
+      // Page with arrow keys
+      if (["ArrowRight","ArrowDown"].includes(key)){
+        event.preventDefault();
+        gotoPage(state.page + 1);
+        return;
+      }
+      if (["ArrowLeft","ArrowUp"].includes(key)){
+        event.preventDefault();
+        gotoPage(state.page - 1);
+        return;
+      }
+
+      // Enter triggers the first item on the page
+      if (key === 'Enter'){
+        event.preventDefault();
+        const item = state.items[start + 0];
+        if (!item) return;
+        if (typeof opts.onEnter === 'function') opts.onEnter(item);
+        return;
+      }
+
+      // Delete/Backspace passes to onDelete for first item (optional behavior retained)
+      if (key === 'Delete' || key === 'Backspace'){
+        if (typeof opts.onDelete === 'function'){
+          event.preventDefault();
+          const item = state.items[start + 0];
+          if (!item) return;
+          const ok = await opts.onDelete(item);
+          if (ok){
+            state.items.splice(start + 0, 1);
+            const pc = pageCount();
+            if (state.page >= pc) state.page = Math.max(0, pc-1);
+            renderPage();
           }
-          return;
         }
-        case 'Delete':
-        case 'Backspace': {
-          if (typeof opts.onDelete === 'function'){
-            const item = state.items[start + state.selectedIndex];
-            if (!item) return;
-            event.preventDefault();
-            const ok = await opts.onDelete(item);
-            if (ok){
-              state.items.splice(start + state.selectedIndex, 1);
-              // Re-render page; handle if page becomes out of bounds
-              const pc = pageCount();
-              if (state.page >= pc) state.page = Math.max(0, pc-1);
-              renderPage();
-            }
-          }
-          return;
-        }
-        default: {
-          const n = parseInt(key, 10);
-          if (!Number.isNaN(n)){
-            const target = n - 1;
-            if (target >= 0 && target < localCount){ updateSelection(target); }
-          }
-          return;
+        return;
+      }
+
+      // Hotkey: explicit per-item or default ordinal (1..9, 0 for 10)
+      const k = key.length === 1 ? key.toLowerCase() : '';
+      if (!k) return;
+
+      let localIndex = undefined;
+      if (k in hotkeyMap){
+        localIndex = hotkeyMap[k];
+      } else {
+        const n = parseInt(k, 10);
+        if (!Number.isNaN(n)){
+          const target = n === 0 ? 9 : (n - 1); // 0 -> index 9 (10th)
+          if (target >= 0 && target < localCount) localIndex = target;
         }
       }
 
-      if (newLocal >= 0 && newLocal < localCount){ updateSelection(newLocal); }
+      if (localIndex !== undefined){
+        event.preventDefault();
+        const item = state.items[start + localIndex];
+        if (!item) return;
+        if (typeof opts.onEnter === 'function') opts.onEnter(item);
+      }
     });
 
     // Buttons
