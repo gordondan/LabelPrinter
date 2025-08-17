@@ -66,7 +66,7 @@
 
                       <!-- Boolean Flags -->
                       <div class="form-group checkbox-group">
-                          <input type="checkbox" id="show_date" name="show_date">
+                          <input type="checkbox" id="show_date" name="show_date" checked>
                           <label for="show_date">Include Today's Date</label>
                       </div>
                       <div class="form-group checkbox-group">
@@ -280,15 +280,59 @@
     // Trigger preview immediately on these toggles (no debounce)
     document.getElementById('border').addEventListener('change', generatePreview);
     document.getElementById('show_date').addEventListener('change', generatePreview);
+    function updateDateControlsState() {
+        const msgEl = document.getElementById('message');
+        const borderEl = document.getElementById('border_message');
+        const sideEl = document.getElementById('side_border');
+        const dateEl = document.getElementById('date');
+        const showDateEl = document.getElementById('show_date');
+        const allFilled = Boolean(msgEl.value && borderEl.value && sideEl.value);
+        if (allFilled) {
+            // Reset and disable date controls per spec
+            dateEl.value = '';
+            showDateEl.checked = true; // defaults to true
+            dateEl.disabled = true;
+            showDateEl.disabled = true;
+        } else {
+            dateEl.disabled = false;
+            showDateEl.disabled = false;
+        }
+    }
+
+    function applyDateToFields(dateStr) {
+        const msgEl = document.getElementById('message');
+        const borderEl = document.getElementById('border_message');
+        const sideEl = document.getElementById('side_border');
+        if (!msgEl.value) {
+            msgEl.value = dateStr;
+            return true;
+        }
+        if (!borderEl.value) {
+            borderEl.value = dateStr;
+            return true;
+        }
+        if (!sideEl.value) {
+            sideEl.value = dateStr;
+            return true;
+        }
+        return false;
+    }
+
     document.getElementById('date').addEventListener('change', () => {
         const dateInput = document.getElementById('date');
-        const showDate = document.getElementById('show_date');
-        // If a date is set, ensure the date is shown so the change is visible
-        if (dateInput && dateInput.value && showDate && !showDate.checked) {
-            showDate.checked = true;
+        const raw = dateInput.value || '';
+        const normalized = normalizeDateString(raw);
+        if (normalized) {
+            applyDateToFields(normalized);
         }
+        updateDateControlsState();
         generatePreview();
     });
+
+    // Re-evaluate date controls enabling when core fields change
+    document.getElementById('message').addEventListener('input', updateDateControlsState);
+    document.getElementById('border_message').addEventListener('input', updateDateControlsState);
+    document.getElementById('side_border').addEventListener('input', updateDateControlsState);
 
     // --- EVENT LISTENER FOR PRINT SUBMISSION ---
     printForm.addEventListener('submit', async (event) => {
