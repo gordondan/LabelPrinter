@@ -10,8 +10,8 @@
   //   })
 
   function createLinkGrid(opts){
-    const COLS = Math.min(1, opts.cols || 2);
-    const ROWS = Math.min(1, opts.rows || 2);
+    const COLS = 2;
+    const ROWS = 2;
     const PAGE_SIZE = COLS * ROWS;
 
     const state = {
