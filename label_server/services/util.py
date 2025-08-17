@@ -149,7 +149,11 @@ def normalize_request_for_template_matching(request_data: dict) -> dict:
     for k, v in request_data.items():
         if k in exclude_keys:
             continue
-        if v is not None and v != '' and v is not False:
+        # Keep booleans (including False) as they affect layout/templates
+        if isinstance(v, bool):
+            normalized[k] = v
+            continue
+        if v is not None and v != '':
             normalized[k] = v
     return normalized
 

@@ -37,7 +37,7 @@ def get_pi_label_options():
         {"flag": "-s", "long_flag": "--side-border", "type": "string", "description": "Custom side border message (left/right, rotated)"},
         {"flag": "-i", "long_flag": "--image", "type": "string", "description": "Path to PNG image to include (cropped to fit)"},
         {"flag": "-o", "long_flag": "--show-date", "type": "bool", "default": False, "description": "Show dates on the label (hidden by default)"},
-        {"flag": "-p", "long_flag": "--preview-only", "type": "bool", "default": False, "description": "Generate label image only (do not print)"},
+    {"flag": None, "long_flag": "--border", "type": "bool", "default": True, "description": "Include a decorative border around the label"},
     ]
     return jsonify({"script": "label-printer.py", "endpoint": "/app/pi-label/options", "options": options})
 
@@ -167,7 +167,9 @@ def api_reprint():
                 return jsonify({'error': f'Invalid original request data: {errors}'}), 400
             cmd = build_command_from_payload(updated_request)
             t0 = time.perf_counter()
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            env = os.environ.copy()
+            env['LABEL_BORDER_ENABLED'] = '1' if updated_request.get('border', True) else '0'
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
             elapsed_sec = time.perf_counter() - t0
             if result.returncode == 0:
                 return jsonify({'ok': True, 'elapsed_sec': round(elapsed_sec, 3), 'method': 'template_regeneration', 'stdout': (result.stdout or '').strip()})
@@ -293,7 +295,9 @@ def api_pi_label_preview():
             }), 200
 
         t0 = time.perf_counter()
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        env = os.environ.copy()
+        env['LABEL_BORDER_ENABLED'] = '1' if data.get('border', True) else '0'
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
         elapsed_sec = time.perf_counter() - t0
         current_app.logger.info("Preview subprocess rc=%s in %.3fs", result.returncode, elapsed_sec)
 
@@ -311,6 +315,15 @@ def api_pi_label_preview():
                 pass
 
         metrics = find_latest_metrics()
+        if result.returncode != 0:
+            # Log details for debugging
+            try:
+                current_app.logger.error("Preview failed. stdout: %s\nstderr: %s", (result.stdout or '').strip(), (result.stderr or '').strip())
+            except Exception:
+                pass
+        error_msg = None
+        if result.returncode != 0:
+            error_msg = (result.stderr or result.stdout or 'Preview failed').strip()
         return jsonify({
             'ok': result.returncode == 0,
             'command': cmd,
@@ -321,6 +334,7 @@ def api_pi_label_preview():
             'preview_url': preview_url,
             'preview_path': rel_path,
             'metrics': metrics,
+            **({'error': error_msg} if error_msg else {}),
         }), (200 if result.returncode == 0 else 500)
     except FileNotFoundError:
         current_app.logger.exception("label-printer.py not found for preview")
@@ -371,7 +385,9 @@ def post_pi_label_print():
             return jsonify({'reused': True, **resp}), code
 
         t0 = time.perf_counter()
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        env = os.environ.copy()
+        env['LABEL_BORDER_ENABLED'] = '1' if data.get('border', True) else '0'
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
         elapsed_sec = time.perf_counter() - t0
         current_app.logger.info("Legacy subprocess finished rc=%s in %.3fs", result.returncode, elapsed_sec)
 
@@ -388,6 +404,14 @@ def post_pi_label_print():
                 save_request_data(preview_path, data)
         except Exception:
             pass
+        if result.returncode != 0:
+            try:
+                current_app.logger.error("Print generation failed. stdout: %s\nstderr: %s", (result.stdout or '').strip(), (result.stderr or '').strip())
+            except Exception:
+                pass
+        error_msg = None
+        if result.returncode != 0:
+            error_msg = (result.stderr or result.stdout or 'Print generation failed').strip()
         return jsonify({
             'command': cmd,
             'returncode': result.returncode,
@@ -396,6 +420,7 @@ def post_pi_label_print():
             'elapsed_sec': round(elapsed_sec, 3),
             'preview_url': preview_url,
             'metrics': metrics,
+            **({'error': error_msg} if error_msg else {}),
         }), (200 if result.returncode == 0 else 500)
     except FileNotFoundError:
         current_app.logger.exception("label-printer.py not found for legacy print")
