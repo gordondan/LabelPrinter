@@ -35,6 +35,7 @@ html, body {
 .lg-button {
   aspect-ratio: 2.25 / 1.25; /* width / height to match label shape */
   display: flex;
+  flex-direction: column; /* stack image and hotkey vertically */
   justify-content: center;
   align-items: center;
   text-decoration: none;
@@ -44,6 +45,7 @@ html, body {
   transition: transform .2s ease, box-shadow .2s ease, outline-offset .2s ease;
   overflow: hidden;
   position: relative;
+  gap: 0.4rem;
   /* Make each tile 75% of the grid cell width */
   width: 75%;
   justify-self: center;
@@ -51,10 +53,24 @@ html, body {
 
 .lg-button img {
   width: 75%;
-  height: 75%;
+  height: auto;           /* keep aspect ratio */
+  max-height: 70%;        /* leave room for hotkey pill */
   object-fit: contain;
   display: block;
   pointer-events: none;
+}
+
+/* Hotkey pill below the image */
+.lg-hotkey {
+  background: var(--lg-sel);
+  color: #1a1a1a;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.1;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.7), 0 2px 6px rgba(0,0,0,0.15);
+  user-select: none;
 }
 
 .lg-button.selected {
