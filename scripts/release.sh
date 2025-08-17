@@ -154,3 +154,17 @@ echo "- Files synced: ${#SYNCED[@]}"
 for s in "${SYNCED[@]}"; do echo "  * $s"; done
 
 echo "\nTip: To test without changes, use: $0 --dry-run"
+
+# Optional: ensure env file for systemd + shells
+if ! $DRY_RUN; then
+  if [[ -f "$REPO_ROOT/scripts/setup_env.sh" ]]; then
+    echo "\n[post] Creating /etc/default/labelprinter via setup_env.sh (sudo may prompt)..."
+    sudo bash "$REPO_ROOT/scripts/setup_env.sh" || echo "Warning: setup_env.sh failed; you can run it manually later."
+  else
+    echo "\n[post] Note: scripts/setup_env.sh not found or not executable; skip env file creation."
+  fi
+  echo "\n[post] To start/restart services (if installed):"
+  echo "  sudo systemctl daemon-reload"
+  echo "  sudo systemctl enable --now labelprinter.service"
+  echo "  sudo systemctl enable --now labelprinter-tcp.service"
+fi
