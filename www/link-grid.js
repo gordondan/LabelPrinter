@@ -83,7 +83,7 @@
       if (el){ el.classList.add('selected'); el.focus(); }
     }
 
-    function renderPage(){
+  function renderPage(){
       grid.innerHTML = '';
       state.buttons = [];
 
@@ -104,7 +104,7 @@
         img.alt = it.title || 'Link';
         a.appendChild(img);
 
-        a.addEventListener('click', (e)=>{
+  a.addEventListener('click', (e)=>{
           // If href provided, allow navigation; otherwise intercept and call onEnter
           if (!it.href){ e.preventDefault(); }
           if (typeof opts.onEnter === 'function') opts.onEnter(it);
@@ -116,7 +116,7 @@
         });
 
         grid.appendChild(a);
-        state.buttons.push(a);
+  state.buttons.push(a);
       });
 
       // reset selection within page
@@ -190,7 +190,7 @@
     prevBtn.addEventListener('click', ()=> gotoPage(state.page - 1));
 
     // Public API
-    return {
+  return {
       async load(){
         state.items = await opts.getItems();
         gotoPage(0);
@@ -201,7 +201,19 @@
       get pageSize(){ return PAGE_SIZE; },
       get cols(){ return COLS; },
       get rows(){ return ROWS; },
-      setStatus(msg){ setStatus(msg); }
+      setStatus(msg){ setStatus(msg); },
+      // Busy state toggling for a given item (by reference) if present on current page
+      setBusy(item, busy){
+        const idx = state.items.indexOf(item);
+        if (idx === -1) return;
+        const start = pageStartIndex(state.page);
+        const end = pageEndIndex(state.page);
+        if (idx < start || idx >= end) return;
+        const local = idx - start;
+        const btn = state.buttons[local];
+        if (!btn) return;
+        if (busy) btn.classList.add('is-busy'); else btn.classList.remove('is-busy');
+      }
     };
   }
 

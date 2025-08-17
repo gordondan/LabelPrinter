@@ -40,6 +40,7 @@ html, body {
   box-shadow: 8px 8px 16px rgba(0,0,0,0.2), -8px -8px 16px rgba(255,255,255,0.7);
   transition: transform .2s ease, box-shadow .2s ease, outline-offset .2s ease;
   overflow: hidden;
+  position: relative;
 }
 
 .lg-button img {
@@ -59,6 +60,29 @@ html, body {
 
 .lg-button:focus { outline: none; }
 .lg-button:not(.selected):hover { transform: scale(1.02); }
+
+/* Click feedback */
+.lg-button:active { filter: brightness(0.9); }
+
+/* Busy overlay for printing */
+.lg-button.is-busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+}
+.lg-button.is-busy::before {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.6);
+  border-top-color: #fff;
+  animation: lg-spin .8s linear infinite;
+}
+
+@keyframes lg-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 
 /* Prev / Next controls with page indicator */
 .lg-controls {

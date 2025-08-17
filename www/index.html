@@ -34,6 +34,7 @@
                     if (item.href) { window.location.href = item.href; return; }
                     if (item.action === 'print-today') {
                         try {
+                            grid.setBusy(item, true);
                             grid.setStatus('Preparing today\'s label…');
                             const payload = { show_date: true, border: true, count: 1 };
                             // Step 1: generate preview to ensure today\'s date is baked in
@@ -56,6 +57,8 @@
                             grid.setStatus('Label sent to printer.');
                         } catch (e) {
                             grid.setStatus('Error: ' + (e.message || e));
+                        } finally {
+                            grid.setBusy(item, false);
                         }
                         return;
                     }
