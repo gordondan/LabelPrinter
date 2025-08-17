@@ -19,6 +19,8 @@ from ..services.util import (
     list_recent_previews,
     relative_to_base,
     safe_path_from_query,
+    save_request_data,
+    find_existing_template_match,
 )
 from ..services.printing import print_png_via_ble
 
@@ -37,7 +39,7 @@ def get_pi_label_options():
         {"flag": "-o", "long_flag": "--show-date", "type": "bool", "default": False, "description": "Show dates on the label (hidden by default)"},
         {"flag": "-p", "long_flag": "--preview-only", "type": "bool", "default": False, "description": "Generate label image only (do not print)"},
     ]
-    return jsonify({"script": "pi-label-printer.py", "endpoint": "/app/pi-label/options", "options": options})
+    return jsonify({"script": "label-printer.py", "endpoint": "/app/pi-label/options", "options": options})
 
 
 @api_bp.get('/api/recent')
@@ -182,7 +184,8 @@ def api_reprint():
 # ----- Label preview/print helpers -----
 
 def build_command_from_payload(payload: dict):
-    script_path = os.path.join(os.path.dirname(__file__), '..', '..', 'pi-label-printer.py')
+    # Use the repo's script name
+    script_path = os.path.join(os.path.dirname(__file__), '..', '..', 'label-printer.py')
     script_path = os.path.normpath(script_path)
     cmd = [sys.executable or 'python3', script_path]
     if payload.get('list') is True:
@@ -248,26 +251,51 @@ def api_pi_label_preview():
     data = dict(data)
     data['preview_only'] = True
     try:
-        api_bp.logger.info("/api/pi-label/preview payload: %s", data)
+        current_app.logger.info("/api/pi-label/preview payload: %s", data)
     except Exception:
         pass
 
     ok, errors = validate_payload(data)
     if not ok:
-        api_bp.logger.warning("Preview validation failed: %s", errors)
+        current_app.logger.warning("Preview validation failed: %s", errors)
         return jsonify({'errors': errors}), 400
 
     cmd = build_command_from_payload(data)
-    script_path = os.path.join(os.path.dirname(__file__), '..', '..', 'pi-label-printer.py')
+    script_path = os.path.join(os.path.dirname(__file__), '..', '..', 'label-printer.py')
     script_path = os.path.normpath(script_path)
-    api_bp.logger.info("Preview executing: %s", ' '.join(map(str, cmd)))
-    api_bp.logger.info("CWD: %s | script exists: %s", os.getcwd(), os.path.isfile(script_path))
+    current_app.logger.info("Preview executing: %s", ' '.join(map(str, cmd)))
+    current_app.logger.info("CWD: %s | script exists: %s", os.getcwd(), os.path.isfile(script_path))
 
     try:
+        # Try template reuse: if a recent request.json matches, reuse the preview directly
+        reused_preview = find_existing_template_match(data)
+        if reused_preview:
+            current_app.logger.info("Reusing existing preview: %s", reused_preview)
+            # Mirror request data next to reused preview
+            try:
+                save_request_data(reused_preview, data)
+            except Exception:
+                pass
+            metrics = find_latest_metrics()
+            ts = int(reused_preview.stat().st_mtime)
+            preview_url = f"/preview/file?path={quote(relative_to_base(reused_preview))}&ts={ts}"
+            return jsonify({
+                'ok': True,
+                'command': cmd,
+                'returncode': 0,
+                'stdout': 'Reused existing preview',
+                'stderr': '',
+                'elapsed_sec': 0,
+                'preview_url': preview_url,
+                'preview_path': relative_to_base(reused_preview),
+                'metrics': metrics,
+                'reused': True,
+            }), 200
+
         t0 = time.perf_counter()
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         elapsed_sec = time.perf_counter() - t0
-        api_bp.logger.info("Preview subprocess rc=%s in %.3fs", result.returncode, elapsed_sec)
+        current_app.logger.info("Preview subprocess rc=%s in %.3fs", result.returncode, elapsed_sec)
 
         preview_path = find_latest_preview()
         preview_url = None
@@ -276,6 +304,11 @@ def api_pi_label_preview():
             ts = int(preview_path.stat().st_mtime)
             preview_url = f"/preview.png?ts={ts}"
             rel_path = relative_to_base(preview_path)
+            # Save request.json alongside the preview for future template reuse
+            try:
+                save_request_data(preview_path, data)
+            except Exception:
+                pass
 
         metrics = find_latest_metrics()
         return jsonify({
@@ -290,10 +323,10 @@ def api_pi_label_preview():
             'metrics': metrics,
         }), (200 if result.returncode == 0 else 500)
     except FileNotFoundError:
-        api_bp.logger.exception("pi-label-printer.py not found for preview")
-        return jsonify({'error': 'pi-label-printer.py not found', 'command': cmd}), 500
+        current_app.logger.exception("label-printer.py not found for preview")
+        return jsonify({'error': 'label-printer.py not found', 'command': cmd}), 500
     except Exception as e:
-        api_bp.logger.error("Unhandled exception in api_pi_label_preview: %s\n%s", str(e), traceback.format_exc())
+        current_app.logger.error("Unhandled exception in api_pi_label_preview: %s\n%s", str(e), traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 
@@ -301,7 +334,7 @@ def api_pi_label_preview():
 def post_pi_label_print():
     data = request.get_json(silent=True) or {}
     try:
-        api_bp.logger.info("/api/pi-label/print payload: %s", data)
+        current_app.logger.info("/api/pi-label/print payload: %s", data)
     except Exception:
         pass
 
@@ -310,26 +343,37 @@ def post_pi_label_print():
         p = safe_path_from_query(unquote(rel.strip()))
         if not p:
             return jsonify({'error': 'Invalid path'}), 400
-        api_bp.logger.info("Printing PNG at: %s", p)
+        current_app.logger.info("Printing PNG at: %s", p)
         ok, resp, code = print_png_via_ble(p)
         return jsonify(resp), code
 
     ok, errors = validate_payload(data)
     if not ok:
-        api_bp.logger.warning("Print validation failed: %s", errors)
+        current_app.logger.warning("Print validation failed: %s", errors)
         return jsonify({'errors': errors}), 400
 
     cmd = build_command_from_payload(data)
-    script_path = os.path.join(os.path.dirname(__file__), '..', '..', 'pi-label-printer.py')
+    script_path = os.path.join(os.path.dirname(__file__), '..', '..', 'label-printer.py')
     script_path = os.path.normpath(script_path)
-    api_bp.logger.info("Legacy print executing: %s", ' '.join(map(str, cmd)))
-    api_bp.logger.info("CWD: %s | script exists: %s", os.getcwd(), os.path.isfile(script_path))
+    current_app.logger.info("Legacy print executing: %s", ' '.join(map(str, cmd)))
+    current_app.logger.info("CWD: %s | script exists: %s", os.getcwd(), os.path.isfile(script_path))
 
     try:
+        # Try template reuse first to avoid regeneration when identical
+        reused_preview = find_existing_template_match(data)
+        if reused_preview:
+            current_app.logger.info("Reusing existing preview for print: %s", reused_preview)
+            try:
+                save_request_data(reused_preview, data)
+            except Exception:
+                pass
+            ok, resp, code = print_png_via_ble(reused_preview)
+            return jsonify({'reused': True, **resp}), code
+
         t0 = time.perf_counter()
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         elapsed_sec = time.perf_counter() - t0
-        api_bp.logger.info("Legacy subprocess finished rc=%s in %.3fs", result.returncode, elapsed_sec)
+        current_app.logger.info("Legacy subprocess finished rc=%s in %.3fs", result.returncode, elapsed_sec)
 
         preview_path = find_latest_preview()
         preview_url = None
@@ -338,6 +382,12 @@ def post_pi_label_print():
             preview_url = f"/preview.png?ts={ts}"
 
         metrics = find_latest_metrics()
+        # Save request.json next to the produced preview
+        try:
+            if preview_path:
+                save_request_data(preview_path, data)
+        except Exception:
+            pass
         return jsonify({
             'command': cmd,
             'returncode': result.returncode,
@@ -348,8 +398,8 @@ def post_pi_label_print():
             'metrics': metrics,
         }), (200 if result.returncode == 0 else 500)
     except FileNotFoundError:
-        api_bp.logger.exception("pi-label-printer.py not found for legacy print")
-        return jsonify({'error': 'pi-label-printer.py not found', 'command': cmd}), 500
+        current_app.logger.exception("label-printer.py not found for legacy print")
+        return jsonify({'error': 'label-printer.py not found', 'command': cmd}), 500
     except Exception as e:
-        api_bp.logger.error("Unhandled exception in legacy post_pi_label_print: %s\n%s", str(e), traceback.format_exc())
+        current_app.logger.error("Unhandled exception in legacy post_pi_label_print: %s\n%s", str(e), traceback.format_exc())
         return jsonify({'error': str(e)}), 500

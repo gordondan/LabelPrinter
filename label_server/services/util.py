@@ -7,7 +7,7 @@ from urllib.parse import quote, unquote
 import os
 import re
 
-BASE_DIR = Path(__file__).resolve().parent.parent  # project root
+BASE_DIR = Path(__file__).resolve().parents[2]  # project root
 WWW_DIR = BASE_DIR / 'www'
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
@@ -152,3 +152,46 @@ def normalize_request_for_template_matching(request_data: dict) -> dict:
         if v is not None and v != '' and v is not False:
             normalized[k] = v
     return normalized
+
+
+def find_existing_template_match(new_request_data: dict) -> Path | None:
+    try:
+        import json
+        from datetime import datetime as _dt
+
+        normalized_new = normalize_request_for_template_matching(new_request_data)
+        past = past_images_dir()
+        if not past.is_dir():
+            return None
+
+        best_match: Path | None = None
+        best_ts = 0
+        for p in past.rglob('request.json'):
+            if 'deleted' in p.parts:
+                continue
+            try:
+                data = json.loads(p.read_text(encoding='utf-8'))
+                existing_template = data.get('normalized_template', {})
+                original_request = data.get('original_request', {})
+                if existing_template == normalized_new:
+                    existing_date = original_request.get('date')
+                    new_date = new_request_data.get('date')
+                    if existing_date and new_date and existing_date != new_date:
+                        continue
+                    elif existing_date and not new_date:
+                        today = _dt.now().strftime('%Y-%m-%d')
+                        if existing_date != today:
+                            continue
+                    elif not existing_date and new_date:
+                        continue
+                    preview_path = p.with_name('label_preview.png')
+                    if preview_path.is_file():
+                        ts = preview_path.stat().st_mtime
+                        if ts > best_ts:
+                            best_match = preview_path
+                            best_ts = ts
+            except Exception:
+                continue
+        return best_match
+    except Exception:
+        return None
