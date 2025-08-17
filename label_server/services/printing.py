@@ -93,8 +93,8 @@ def print_png_via_ble(p: Path):
                 printer_name = (cfg or {}).get('default_printer')
             except Exception:
                 printer_name = None
-        pble.print_pil_image(
-            img,
+        # Build args common to both platforms
+        call_kwargs = dict(
             label_w_mm=w_in * 25.4,
             label_h_mm=h_in * 25.4,
             gap_mm=gap_mm,
@@ -102,9 +102,13 @@ def print_png_via_ble(p: Path):
             speed=speed,
             direction=direction,
             x=0, y=0, mode=0,
-            printer_name=printer_name,
-            printer_config=pcfg
         )
+        # Only Windows backend supports these parameters
+        if sys.platform.lower().startswith('win'):
+            call_kwargs['printer_name'] = printer_name
+            call_kwargs['printer_config'] = pcfg
+
+        pble.print_pil_image(img, **call_kwargs)
         elapsed_sec = time.perf_counter() - t0
         return True, {'ok': True, 'elapsed_sec': round(elapsed_sec, 3), 'method': 'direct_image_printing'}, 200
     except Exception as e:
