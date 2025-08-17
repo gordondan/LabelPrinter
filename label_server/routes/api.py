@@ -31,7 +31,6 @@ api_bp = Blueprint('api', __name__)
 def get_pi_label_options():
     options = [
         {"flag": "-c", "long_flag": "--count", "type": "int", "default": 1, "description": "Number of labels to print"},
-        {"flag": "-d", "long_flag": "--date", "type": "string", "format": "YYYY-MM-DD", "description": "Specific date to print (default: today)"},
         {"flag": "-m", "long_flag": "--message", "type": "string", "description": "Custom message to print in center of label"},
         {"flag": "-b", "long_flag": "--border-message", "type": "string", "description": "Custom border message for top and bottom borders"},
         {"flag": "-s", "long_flag": "--side-border", "type": "string", "description": "Custom side border message (left/right, rotated)"},
@@ -157,10 +156,8 @@ def api_reprint():
     if original_request:
         try:
             updated_request = dict(original_request)
-            if 'message' in updated_request and updated_request['message'] and '{{date}}' in str(updated_request['message']):
-                pass
-            elif 'date' not in updated_request or not updated_request['date']:
-                updated_request.pop('date', None)
+            # 'date' is no longer a CLI flag; keep it only as part of user content if present
+            updated_request.pop('date', None)
             updated_request['preview_only'] = False
             ok, errors = validate_payload(updated_request)
             if not ok:
@@ -207,7 +204,7 @@ def build_command_from_payload(payload: dict):
             pass
 
     mapping = [
-        ('date', '-d'), ('message', '-m'), ('border_message', '-b'), ('side_border', '-s'), ('image', '-i'),
+        ('message', '-m'), ('border_message', '-b'), ('side_border', '-s'), ('image', '-i'),
     ]
     for key, flag in mapping:
         val = payload.get(key)
@@ -226,17 +223,7 @@ def validate_payload(payload: dict):
         except (TypeError, ValueError):
             errors.append("'count' must be an integer")
 
-    date_val = payload.get('date')
-    if date_val:
-        import re as _re
-        from datetime import datetime as _dt
-        if not isinstance(date_val, str) or not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_val):
-            errors.append("'date' must be in YYYY-MM-DD format")
-        else:
-            try:
-                _dt.strptime(date_val, "%Y-%m-%d")
-            except ValueError:
-                errors.append("'date' is not a valid calendar date")
+    # 'date' is no longer a script parameter; when present in payload it's user text content.
 
     img = payload.get('image')
     if img:

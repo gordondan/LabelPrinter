@@ -80,8 +80,19 @@ def print_png_via_ble(p: Path):
 
     try:
         t0 = time.perf_counter()
+        # On Windows, RW402BPrinter may accept a config dict; on Linux it will ignore extra kwargs
+        extra_kwargs = {}
+        if sys.platform.lower().startswith('win'):
+            extra_kwargs['config'] = cfg or {}
         pble = RW402BPrinter(addr=ble_mac, timeout=float(pcfg.get('bluetooth_wait_time', 4.0)),
-                              dpi=dpi, invert=invert)
+                              dpi=dpi, invert=invert, **extra_kwargs)
+        # Choose printer name on Windows (use configured default_printer); Linux ignores this parameter
+        printer_name = None
+        if sys.platform.lower().startswith('win'):
+            try:
+                printer_name = (cfg or {}).get('default_printer')
+            except Exception:
+                printer_name = None
         pble.print_pil_image(
             img,
             label_w_mm=w_in * 25.4,
@@ -90,7 +101,9 @@ def print_png_via_ble(p: Path):
             density=density,
             speed=speed,
             direction=direction,
-            x=0, y=0, mode=0
+            x=0, y=0, mode=0,
+            printer_name=printer_name,
+            printer_config=pcfg
         )
         elapsed_sec = time.perf_counter() - t0
         return True, {'ok': True, 'elapsed_sec': round(elapsed_sec, 3), 'method': 'direct_image_printing'}, 200

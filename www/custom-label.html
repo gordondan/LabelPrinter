@@ -21,8 +21,23 @@
             <div class="form-grid">
                 <!-- Main Message -->
                 <div class="form-group full-width">
-                    <label for="message">Message</label>
+                    <label for="message">Message
+                        <button type="button" id="msgDateBtn" class="icon-btn" title="Append a date" style="margin-left:6px;">�</button>
+                    </label>
                     <input type="text" id="message" name="message" placeholder="e.g., It's leftovers enjoy it!">
+                    <input type="date" id="msgDatePicker" style="display:none;" aria-hidden="true">
+                </div>
+
+                <!-- Quick toggles visible on load -->
+                <div class="form-group full-width" style="display:flex; gap:1rem; align-items:center; flex-wrap:nowrap;">
+                    <label style="display:inline-flex; align-items:center; gap:0.5rem; white-space:nowrap;">
+                        <input type="checkbox" id="show_date" name="show_date" checked>
+                        Include Today's Date
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:0.5rem; white-space:nowrap;">
+                        <input type="checkbox" id="border" name="border" checked>
+                        Border
+                    </label>
                 </div>
 
                 <!-- Expandable Advanced Options -->
@@ -31,23 +46,25 @@
                     <summary style="cursor:pointer;font-weight:700;">More options</summary>
                     <div class="form-grid" style="margin-top:1rem;">
                       <!-- Border Messages -->
-                      <div class="form-group">
-                          <label for="border_message">Top/Bottom Border Text</label>
-                          <input type="text" id="border_message" name="border_message">
-                      </div>
-                      <div class="form-group">
-                          <label for="side_border">Side Border Text</label>
-                          <input type="text" id="side_border" name="side_border">
-                      </div>
+                                                                    <div class="form-group">
+                                                                            <label for="border_message">Top/Bottom Border Text
+                                                                                <button type="button" id="borderDateBtn" class="icon-btn" title="Append a date" style="margin-left:6px;">�</button>
+                                                                            </label>
+                                                                            <input type="text" id="border_message" name="border_message">
+                                                                            <input type="date" id="borderDatePicker" style="display:none;" aria-hidden="true">
+                                                                    </div>
+                                                                    <div class="form-group">
+                                                                            <label for="side_border">Side Border Text
+                                                                                <button type="button" id="sideDateBtn" class="icon-btn" title="Append a date" style="margin-left:6px;">�</button>
+                                                                            </label>
+                                                                            <input type="text" id="side_border" name="side_border">
+                                                                            <input type="date" id="sideDatePicker" style="display:none;" aria-hidden="true">
+                                                                    </div>
 
-                      <!-- Count and Date -->
+                      <!-- Count -->
                       <div class="form-group">
                           <label for="count">Count</label>
                           <input type="number" id="count" name="count" value="1" min="1">
-                      </div>
-                      <div class="form-group">
-                          <label for="date">Date (optional)</label>
-                          <input type="date" id="date" name="date">
                       </div>
 
                       <!-- Image Upload (Optional) -->
@@ -63,17 +80,10 @@
                               <button type="button" id="removeImageButton">Remove Image</button>
                           </div>
                       </div>
-
-                      <!-- Boolean Flags -->
-                      <div class="form-group checkbox-group">
-                          <input type="checkbox" id="show_date" name="show_date" checked>
-                          <label for="show_date">Include Today's Date</label>
-                      </div>
-                      <div class="form-group checkbox-group">
-                          <input type="checkbox" id="border" name="border" checked>
-                          <label for="border">Border</label>
-                      </div>
                     </div>
+                      <!-- Boolean Flags -->
+                      <!-- show_date moved above for quick access -->
+                      <!-- border moved above for quick access -->
                   </details>
                 </div>
             </div>
@@ -138,28 +148,36 @@
         return uploadedImagePath;
     }
 
-    function normalizeDateString(v) {
-        if (!v) return '';
-        // Accept mm/dd/yyyy and convert to yyyy-mm-dd
-        if (v.includes('/')) {
-            const [mm, dd, yyyy] = v.split('/');
-            if (yyyy && mm && dd) return `${yyyy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
-        }
-        return v; // assume already yyyy-mm-dd
+    function formatLongDate(dateStr) {
+        // dateStr is yyyy-mm-dd
+        try {
+            // Avoid timezone shifts by forcing midnight
+            const d = new Date(dateStr + 'T00:00:00');
+            return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
+        } catch { return dateStr; }
     }
 
     function buildPayload({ previewOnly }) {
         const printPayload = {};
         const formData = new FormData(printForm);
-        for (const [key, value] of formData.entries()) {
-            if (key === 'imageFile') continue;
-            if (typeof value === 'string' && value.trim() !== '') {
-                printPayload[key] = key === 'date' ? normalizeDateString(value.trim()) : value.trim();
-            }
-        }
-        // Always send boolean flags explicitly so server/template reuse can distinguish false vs missing
-        printPayload.show_date = formData.has('show_date');
-        printPayload.border = formData.has('border');
+        // Base map of current field values (don't mutate DOM)
+    const raw = {
+            message: (formData.get('message') || '').toString(),
+            border_message: (formData.get('border_message') || '').toString(),
+            side_border: (formData.get('side_border') || '').toString(),
+            count: (formData.get('count') || '').toString(),
+        };
+
+        // Copy populated values into payload
+        if (raw.message.trim() !== '') printPayload.message = raw.message.trim();
+        if (raw.border_message.trim() !== '') printPayload.border_message = raw.border_message.trim();
+        if (raw.side_border.trim() !== '') printPayload.side_border = raw.side_border.trim();
+        if (raw.count.trim() !== '') printPayload.count = raw.count.trim();
+    // Always send border and show_date explicitly
+    const borderEl = document.getElementById('border');
+    printPayload.border = !!(borderEl && borderEl.checked);
+    const showDateEl = document.getElementById('show_date');
+    printPayload.show_date = !!(showDateEl && showDateEl.checked);
         // preview-only flag removed; server infers preview by endpoint
         if (uploadedImagePath) printPayload.image = uploadedImagePath;
         return printPayload;
@@ -277,27 +295,9 @@
         }
     });
 
-    // Trigger preview immediately on these toggles (no debounce)
+    // Trigger preview immediately on border/show_date toggles (no debounce)
     document.getElementById('border').addEventListener('change', generatePreview);
     document.getElementById('show_date').addEventListener('change', generatePreview);
-    function updateDateControlsState() {
-        const msgEl = document.getElementById('message');
-        const borderEl = document.getElementById('border_message');
-        const sideEl = document.getElementById('side_border');
-        const dateEl = document.getElementById('date');
-        const showDateEl = document.getElementById('show_date');
-        const allFilled = Boolean(msgEl.value && borderEl.value && sideEl.value);
-        if (allFilled) {
-            // Reset and disable date controls per spec
-            dateEl.value = '';
-            showDateEl.checked = true; // defaults to true
-            dateEl.disabled = true;
-            showDateEl.disabled = true;
-        } else {
-            dateEl.disabled = false;
-            showDateEl.disabled = false;
-        }
-    }
 
     function applyDateToFields(dateStr) {
         const msgEl = document.getElementById('message');
@@ -318,21 +318,25 @@
         return false;
     }
 
-    document.getElementById('date').addEventListener('change', () => {
-        const dateInput = document.getElementById('date');
-        const raw = dateInput.value || '';
-        const normalized = normalizeDateString(raw);
-        if (normalized) {
-            applyDateToFields(normalized);
-        }
-        updateDateControlsState();
-        generatePreview();
-    });
-
-    // Re-evaluate date controls enabling when core fields change
-    document.getElementById('message').addEventListener('input', updateDateControlsState);
-    document.getElementById('border_message').addEventListener('input', updateDateControlsState);
-    document.getElementById('side_border').addEventListener('input', updateDateControlsState);
+    // Calendar buttons open pickers; selection appends a formatted date to the field
+    function attachCalendarPair(fieldId, btnId, pickerId) {
+        const field = document.getElementById(fieldId);
+        const btn = document.getElementById(btnId);
+        const picker = document.getElementById(pickerId);
+        btn.addEventListener('click', () => picker.showPicker ? picker.showPicker() : picker.click());
+        picker.addEventListener('change', () => {
+            const v = (picker.value || '').trim();
+            if (!v) return;
+            const s = field.value || '';
+            const pretty = formatLongDate(v);
+            field.value = (s.length === 0 || /\s$/.test(s)) ? (s + pretty) : (s + ' ' + pretty);
+            picker.value = '';
+            generatePreview();
+        });
+    }
+    attachCalendarPair('message', 'msgDateBtn', 'msgDatePicker');
+    attachCalendarPair('border_message', 'borderDateBtn', 'borderDatePicker');
+    attachCalendarPair('side_border', 'sideDateBtn', 'sideDatePicker');
 
     // --- EVENT LISTENER FOR PRINT SUBMISSION ---
     printForm.addEventListener('submit', async (event) => {

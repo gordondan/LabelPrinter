@@ -10,11 +10,14 @@ from PIL import Image, ImageDraw, ImageFont
 
 from logger import create_logger
 
-# BLE printer module (no-op on Windows if you want)
+# Cross-platform printer selection
+import platform as _platform
 try:
-    from rw402b_ble.printer import RW402BPrinter
-except Exception as e:
-    # You can keep running in preview mode without this on Windows
+    if _platform.system().lower().startswith('win'):
+        from rw402b_ble.windows.printer import RW402BPrinter  # type: ignore
+    else:
+        from rw402b_ble.linux.printer import RW402BPrinter  # type: ignore
+except Exception:
     RW402BPrinter = None
 
 
@@ -766,51 +769,61 @@ def generate_label_image(date_str, date_obj, config, printer_config, message=Non
     return image
 
 def print_label(image, printer_name, config, printer_config):
-    """
-    On Linux/Pi: send the PIL image to RW402B over BLE using TSPL.
+    """Send the PIL image to the printer (Windows: Win32 drivers, Linux: BLE).
+    Returns True/False success.
     """
 
-    # ---- Linux/Pi BLE path ----
     if RW402BPrinter is None:
-        print("BLE printer module not available. Install it or run in --preview-only.")
+        print("Printer module not available. Install requirements or run with --preview-only.")
         return False
 
     try:
+        system = _platform.system().lower()
         dpi = int(printer_config.get('dpi', 203))
         label_w_in = float(printer_config.get('label_width_in', 2.25))
         label_h_in = float(printer_config.get('label_height_in', 1.25))
-
-        # Convert inches -> mm for TSPL SIZE command
-        label_w_mm = label_w_in * 25.4
-        label_h_mm = label_h_in * 25.4
-
         gap_mm     = float(printer_config.get('gap_mm', 3.0))
         density    = int(printer_config.get('density', 8))
         speed      = int(printer_config.get('speed', 4))
         direction  = int(printer_config.get('direction', 1))
-        invert     = bool(printer_config.get('invert', True))  # you found invert=True works
+        invert     = bool(printer_config.get('invert', True))
 
-        # Optional: fixed BLE MAC; if absent we auto-scan by name (RW402B/Munbyn/Beeprt)
-        ble_mac = printer_config.get('ble_mac') or None
-
-        # Fire!
-        p = RW402BPrinter(addr=ble_mac, timeout=float(printer_config.get('bluetooth_wait_time', 4.0)),
-                          dpi=dpi, invert=invert)
-        p.print_pil_image(
-            image,
-            label_w_mm=label_w_mm,
-            label_h_mm=label_h_mm,
-            gap_mm=gap_mm,
-            density=density,
-            speed=speed,
-            direction=direction,
-            x=0, y=0, mode=0
-        )
-        print("Label sent over BLE to RW402B.")
-        return True
+        if system.startswith('win'):
+            # Windows driver-based path
+            printer = RW402BPrinter(dpi=dpi, invert=invert, config=config)
+            ok = printer.print_pil_image(
+                image,
+                label_w_mm=label_w_in * 25.4,
+                label_h_mm=label_h_in * 25.4,
+                gap_mm=gap_mm,
+                density=density,
+                speed=speed,
+                direction=direction,
+                x=0, y=0, mode=0,
+                printer_name=printer_name,
+                printer_config=printer_config,
+            )
+            return bool(ok)
+        else:
+            # Linux/Pi BLE path
+            ble_mac = printer_config.get('ble_mac') or None
+            printer = RW402BPrinter(addr=ble_mac, timeout=float(printer_config.get('bluetooth_wait_time', 4.0)),
+                                    dpi=dpi, invert=invert)
+            printer.print_pil_image(
+                image,
+                label_w_mm=label_w_in * 25.4,
+                label_h_mm=label_h_in * 25.4,
+                gap_mm=gap_mm,
+                density=density,
+                speed=speed,
+                direction=direction,
+                x=0, y=0, mode=0
+            )
+            print("Label sent to RW402B (BLE).")
+            return True
 
     except Exception as e:
-        print(f"BLE printing failed: {e}")
+        print(f"Printing failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -867,8 +880,6 @@ if __name__ == "__main__":
     )
     parser.add_argument('-c', '--count', type=int, default=1, 
                         help='Number of labels to print (default: 1)')
-    parser.add_argument('-d', '--date', type=str, 
-                        help='Specific date to print (format: YYYY-MM-DD, default: today)')
     parser.add_argument('-m', '--message', type=str, 
                         help='Custom message to print in center of label')
     parser.add_argument('-b', '--border-message', type=str,
@@ -892,11 +903,16 @@ if __name__ == "__main__":
     _profile['config_load'] = time.perf_counter() - _t0
     logger.log("Configuration loaded successfully")
     
-    # Step 1: Get printer selection
-    selected_printer = "RW402B"
+    # Step 1: Get printer selection/profile
+    printer_profile_key = "RW402B"  # config key for dimensions/specs
+    # On Windows, suggest the spooler printer name from config.default_printer (but do not use OS default implicitly)
+    _sys = _platform.system().lower()
+    windows_printer_name = None
+    if _sys.startswith('win'):
+        windows_printer_name = config.get('default_printer') or None
     
     # Get printer-specific configuration
-    printer_config = get_printer_config(config, selected_printer)
+    printer_config = get_printer_config(config, printer_profile_key)
     
     # Step 2: Try to connect to Bluetooth printer (best effort)
     if printer_config['bluetooth_device_name']:
@@ -907,18 +923,9 @@ if __name__ == "__main__":
         _profile['bluetooth_wait'] = time.perf_counter() - _t0
 
     # Step 3: Generate the label image
-    if args.date:
-        try:
-            # Parse the provided date
-            date_obj = datetime.strptime(args.date, "%Y-%m-%d")
-            date_str = date_obj.strftime(config['date_format'])
-            print(f"Using specified date: {date_str}")
-        except ValueError:
-            print(f"Invalid date format: {args.date}. Please use YYYY-MM-DD format.")
-            exit(1)
-    else:
-        date_obj = datetime.now()
-        date_str = date_obj.strftime(config['date_format'])
+    # Only today's date is supported now; no -d override
+    date_obj = datetime.now()
+    date_str = date_obj.strftime(config['date_format'])
     
     # Log label generation details
     logger.log_label_generation(date_str, args.message, args.border_message, not args.show_date, args.count)
@@ -947,8 +954,9 @@ if __name__ == "__main__":
         logger.log("Preview mode: No printing requested")
     else:
         print(f"\nPrinting {args.count} label(s)...")
-        logger.log(f"Starting print job: {args.count} label(s) to {selected_printer}")
-    
+        dest_name = windows_printer_name if _sys.startswith('win') else printer_profile_key
+        logger.log(f"Starting print job: {args.count} label(s) to {dest_name}")
+
         for label_num in range(1, args.count + 1):
             if args.count > 1:
                 print(f"\nLabel {label_num} of {args.count}:")
@@ -959,7 +967,7 @@ if __name__ == "__main__":
                 print(f"  Print attempt {attempt + 1} of {config['max_retries']}...")
                 logger.log(f"Print attempt {attempt + 1} of {config['max_retries']}")
                 _t0 = time.perf_counter()
-                success = print_label(label_img, selected_printer, config, printer_config)
+                success = print_label(label_img, (windows_printer_name if _sys.startswith('win') else printer_profile_key), config, printer_config)
                 _elapsed = time.perf_counter() - _t0
                 _profile['print_attempt_times'].append(_elapsed)
                 if success:

@@ -2,4 +2,5 @@ flask>=2.3
 gunicorn>=21.2
 pillow>=10.0
 bleak>=0.22
+pywin32>=306; platform_system == "Windows"
 

@@ -157,12 +157,15 @@ input[type="date"] {
 #previewContainer {
     margin-top: 1.5rem;
     text-align: center;
+    display: flex;
+    justify-content: center;
 }
 
 #previewImage {
     max-width: 100%;
     border: 1px solid #ddd;
     display: none;
+    margin: 0 auto;
 }
 
 /* Dim the preview while generating */
