@@ -280,7 +280,15 @@
     // Trigger preview immediately on these toggles (no debounce)
     document.getElementById('border').addEventListener('change', generatePreview);
     document.getElementById('show_date').addEventListener('change', generatePreview);
-    document.getElementById('date').addEventListener('change', generatePreview);
+    document.getElementById('date').addEventListener('change', () => {
+        const dateInput = document.getElementById('date');
+        const showDate = document.getElementById('show_date');
+        // If a date is set, ensure the date is shown so the change is visible
+        if (dateInput && dateInput.value && showDate && !showDate.checked) {
+            showDate.checked = true;
+        }
+        generatePreview();
+    });
 
     // --- EVENT LISTENER FOR PRINT SUBMISSION ---
     printForm.addEventListener('submit', async (event) => {
