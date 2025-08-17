@@ -26,6 +26,9 @@ html, body {
   max-width: 1200px;
   width: 100%;
   box-sizing: border-box;
+  background: #fff;
+  border: 8px solid var(--lg-accent);
+  border-radius: 12px;
 }
 
 /* Link tile styled like the kiosk buttons but with label aspect ratio */
@@ -41,6 +44,9 @@ html, body {
   transition: transform .2s ease, box-shadow .2s ease, outline-offset .2s ease;
   overflow: hidden;
   position: relative;
+  /* Make each tile 75% of the grid cell width */
+  width: 75%;
+  justify-self: center;
 }
 
 .lg-button img {
