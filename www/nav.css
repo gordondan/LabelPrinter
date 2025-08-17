@@ -30,6 +30,16 @@
   letter-spacing: .2px;
 }
 
+.jobs-badge{
+  font-weight: 700;
+  color: #b45309;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  padding: 2px 8px;
+  margin-left: 8px;
+}
+
 /* Ensure header inherits the page font */
 .site-header, .site-header * { font-family: inherit; }
 

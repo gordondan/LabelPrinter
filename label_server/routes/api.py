@@ -23,6 +23,7 @@ from ..services.util import (
     find_existing_template_match,
 )
 from ..services.printing import print_png_via_ble
+from ..services.jobs import JobStatus
 from ..services.events import bus
 from flask import stream_with_context
 
@@ -362,9 +363,14 @@ def post_pi_label_print():
         p = safe_path_from_query(unquote(rel.strip()))
         if not p:
             return jsonify({'error': 'Invalid path'}), 400
-        current_app.logger.info("Printing PNG at: %s", p)
-        ok, resp, code = print_png_via_ble(p)
-        return jsonify(resp), code
+        current_app.logger.info("Queueing print PNG at: %s", p)
+        jq = getattr(current_app, 'job_queue', None)
+        if not jq:
+            ok, resp, code = print_png_via_ble(p)
+            return jsonify(resp), code
+        # Enqueue direct image print
+        job = jq.enqueue('print', lambda: print_png_via_ble(p), payload={'path': rel})
+        return jsonify({'queued': True, 'job_id': job.id, 'status': job.status}), 202
 
     ok, errors = validate_payload(data)
     if not ok:
@@ -377,59 +383,95 @@ def post_pi_label_print():
     current_app.logger.info("Legacy print executing: %s", ' '.join(map(str, cmd)))
     current_app.logger.info("CWD: %s | script exists: %s", os.getcwd(), os.path.isfile(script_path))
 
-    try:
-        # Try template reuse first to avoid regeneration when identical
-        reused_preview = find_existing_template_match(data)
-        if reused_preview:
-            current_app.logger.info("Reusing existing preview for print: %s", reused_preview)
-            try:
-                save_request_data(reused_preview, data)
-            except Exception:
-                pass
-            ok, resp, code = print_png_via_ble(reused_preview)
-            return jsonify({'reused': True, **resp}), code
-
-        t0 = time.perf_counter()
-        env = os.environ.copy()
-        env['LABEL_BORDER_ENABLED'] = '1' if data.get('border', True) else '0'
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
-        elapsed_sec = time.perf_counter() - t0
-        current_app.logger.info("Legacy subprocess finished rc=%s in %.3fs", result.returncode, elapsed_sec)
-
-        preview_path = find_latest_preview()
-        preview_url = None
-        if preview_path:
-            ts = int(preview_path.stat().st_mtime)
-            preview_url = f"/preview.png?ts={ts}"
-
-        metrics = find_latest_metrics()
-        # Save request.json next to the produced preview
+    # Queue legacy generation+print as a job to return immediately
+    jq = getattr(current_app, 'job_queue', None)
+    if not jq:
+        # Fallback to original blocking behavior
         try:
-            if preview_path:
-                save_request_data(preview_path, data)
+            # Try template reuse first to avoid regeneration when identical
+            reused_preview = find_existing_template_match(data)
+            if reused_preview:
+                current_app.logger.info("Reusing existing preview for print: %s", reused_preview)
+                try:
+                    save_request_data(reused_preview, data)
+                except Exception:
+                    pass
+                ok, resp, code = print_png_via_ble(reused_preview)
+                return jsonify({'reused': True, **resp}), code
         except Exception:
             pass
-        if result.returncode != 0:
+        return jsonify({'error': 'Job queue unavailable'}), 503
+    # Build job closure
+    def _job_fn():
+        try:
+            reused_preview = find_existing_template_match(data)
+            if reused_preview:
+                try:
+                    save_request_data(reused_preview, data)
+                except Exception:
+                    pass
+                return print_png_via_ble(reused_preview)
+            env = os.environ.copy()
+            env['LABEL_BORDER_ENABLED'] = '1' if data.get('border', True) else '0'
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+            if result.returncode != 0:
+                raise RuntimeError((result.stderr or result.stdout or 'Print generation failed').strip())
+            preview_path = find_latest_preview()
+            if not preview_path:
+                raise RuntimeError('No preview generated')
             try:
-                current_app.logger.error("Print generation failed. stdout: %s\nstderr: %s", (result.stdout or '').strip(), (result.stderr or '').strip())
+                save_request_data(preview_path, data)
             except Exception:
                 pass
-        error_msg = None
-        if result.returncode != 0:
-            error_msg = (result.stderr or result.stdout or 'Print generation failed').strip()
-        return jsonify({
-            'command': cmd,
-            'returncode': result.returncode,
-            'stdout': result.stdout,
-            'stderr': result.stderr,
-            'elapsed_sec': round(elapsed_sec, 3),
-            'preview_url': preview_url,
-            'metrics': metrics,
-            **({'error': error_msg} if error_msg else {}),
-        }), (200 if result.returncode == 0 else 500)
-    except FileNotFoundError:
-        current_app.logger.exception("label-printer.py not found for legacy print")
-        return jsonify({'error': 'label-printer.py not found', 'command': cmd}), 500
-    except Exception as e:
-        current_app.logger.error("Unhandled exception in legacy post_pi_label_print: %s\n%s", str(e), traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+            return print_png_via_ble(preview_path)
+        except Exception as e:
+            return False, {'error': str(e)}, 500
+    job = jq.enqueue('print', _job_fn, payload={'payload': data})
+    return jsonify({'queued': True, 'job_id': job.id, 'status': job.status}), 202
+
+
+@api_bp.get('/api/jobs')
+def api_jobs_list():
+    jq = getattr(current_app, 'job_queue', None)
+    if not jq:
+        return jsonify({'jobs': []})
+    jobs = jq.list()
+    return jsonify({'jobs': [
+        {
+            'id': j.id,
+            'type': j.type,
+            'status': j.status,
+            'created_at': j.created_at,
+            'started_at': j.started_at,
+            'finished_at': j.finished_at,
+            'error': j.error,
+        } for j in jobs
+    ]})
+
+
+@api_bp.get('/api/jobs/<job_id>')
+def api_jobs_get(job_id: str):
+    jq = getattr(current_app, 'job_queue', None)
+    if not jq:
+        return jsonify({'error': 'Job queue unavailable'}), 503
+    j = jq.get(job_id)
+    if not j:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify({
+        'id': j.id,
+        'type': j.type,
+        'status': j.status,
+        'created_at': j.created_at,
+        'started_at': j.started_at,
+        'finished_at': j.finished_at,
+        'error': j.error,
+        'result': j.result if isinstance(j.result, dict) else None,
+    })
+
+
+@api_bp.get('/api/jobs/counts')
+def api_jobs_counts():
+    jq = getattr(current_app, 'job_queue', None)
+    if not jq:
+        return jsonify({'queued': 0, 'running': 0, 'total_active': 0})
+    return jsonify(jq.counts())

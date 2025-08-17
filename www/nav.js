@@ -10,7 +10,7 @@
     header.className = 'site-header';
     header.innerHTML = `
       <div class="inner">
-        <a class="site-brand" href="/">Label Printer</a>
+        <a class="site-brand" href="/">Label Printer <span id="jobsBadge" class="jobs-badge" style="display:none;"></span></a>
         <nav class="site-nav">
           <a href="/" data-nav>Home <span class="nav-hotkey">(h)</span></a>
           <a href="/custom-label.html" data-nav>Custom Label <span class="nav-hotkey">(c)</span></a>
@@ -43,6 +43,20 @@
       ev.preventDefault();
       window.location.href = href;
     }, { passive: false });
+
+    // Poll job counts and update header badge
+    const badge = header.querySelector('#jobsBadge');
+    async function refreshJobs(){
+      try{
+        const r = await fetch('/api/jobs/counts', { cache: 'no-store' });
+        const j = await r.json();
+        const n = (j && (j.total_active || 0)) || 0;
+        if (n > 0){ badge.textContent = `(${n}) Jobs running`; badge.style.display = ''; }
+        else { badge.textContent = ''; badge.style.display = 'none'; }
+      }catch{}
+    }
+    refreshJobs();
+    setInterval(refreshJobs, 2000);
   }
 
   window.renderSiteHeader = renderHeader;

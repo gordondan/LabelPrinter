@@ -29,6 +29,13 @@ def create_app() -> Flask:
     from .routes.api import api_bp
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp, url_prefix='')
+    # Start background job queue
+    try:
+        from .services.jobs import JobQueue
+        app.job_queue = JobQueue()  # type: ignore[attr-defined]
+        app.job_queue.start()       # type: ignore[attr-defined]
+    except Exception as e:
+        app.logger.warning("Job queue not started: %s", e)
     # Optional: start GPIO listener on Raspberry Pi if enabled
     try:
         from .services.gpio_listener import GPIOListener

@@ -4,8 +4,17 @@ from __future__ import annotations
 import asyncio
 import math
 from typing import Optional, Tuple
+import time
+import os
 
 from bleak import BleakScanner, BleakClient
+
+# Enable verbose timing/debug by environment variable (default on)
+DEBUG = os.getenv('RW402B_DEBUG', '1').lower() in ('1', 'true', 'yes', 'y')
+
+def _dbg(msg: str):
+    if DEBUG:
+        print(f"[rw402b] {msg}")
 
 # Candidate GATT characteristics seen on RW402B
 WRITE_CANDIDATES = [
@@ -29,6 +38,7 @@ def _pil_to_tspl_bitmap(img, label_w_mm: float, label_h_mm: float, dpi: int, inv
     """
     from PIL import Image
 
+    t0 = time.monotonic()
     label_w = _mm_to_dots(label_w_mm, dpi)
     label_h = _mm_to_dots(label_h_mm, dpi)
 
@@ -38,13 +48,17 @@ def _pil_to_tspl_bitmap(img, label_w_mm: float, label_h_mm: float, dpi: int, inv
 
     # Resize to label width, keep aspect
     w, h = im.size
+    resized = False
     if w != label_w:
         new_h = int(round(h * (label_w / w)))
         im = im.resize((label_w, new_h), Image.NEAREST)
+        resized = True
 
     # Clamp height to label height
+    cropped = False
     if im.height > label_h:
         im = im.crop((0, 0, im.width, label_h))
+        cropped = True
 
     # Pack bits MSB-first, 1 = black (RW402B needed invert=True in your tests)
     packed = bytearray()
@@ -71,6 +85,8 @@ def _pil_to_tspl_bitmap(img, label_w_mm: float, label_h_mm: float, dpi: int, inv
 
     width_bytes = math.ceil(im.width / 8)
     height = im.height
+    dt = (time.monotonic() - t0) * 1000.0
+    _dbg(f"bitmap: src={w}x{h} dots, target={label_w}x{label_h} dots, resized={resized}, cropped={cropped}, wb={width_bytes}, h={height}, invert={invert}, took={dt:.1f}ms")
     return packed, width_bytes, height
 
 class RW402BPrinter:
@@ -99,17 +115,24 @@ class RW402BPrinter:
     async def _async_print_pil_image(self, img, label_w_mm: float, label_h_mm: float, gap_mm: float,
                                      density: int, speed: int, direction: int,
                                      x: int, y: int, mode: int) -> None:
+        t_start = time.monotonic()
+        t0 = time.monotonic()
         addr = self.addr or await self._scan_for_printer()
+        _dbg(f"phase: scan took {(time.monotonic()-t0)*1000:.1f}ms")
         if not addr:
             raise RuntimeError("RW402B not found during scan.")
 
         if not self._write_uuid:
+            t1 = time.monotonic()
             path = await self._choose_write_path(addr)
+            _dbg(f"phase: choose_write_path took {(time.monotonic()-t1)*1000:.1f}ms")
             if not path:
                 raise RuntimeError("No writable BLE characteristic found on RW402B.")
             self._write_uuid, self._write_resp = path
 
+        t2 = time.monotonic()
         packed, wb, h = _pil_to_tspl_bitmap(img, label_w_mm, label_h_mm, self.dpi, self.invert)
+        _dbg(f"phase: bitmap conversion took {(time.monotonic()-t2)*1000:.1f}ms; payload={len(packed)} bytes")
         header = (
             f"SIZE {label_w_mm:.2f} mm,{label_h_mm:.2f} mm\r\n"
             f"GAP {gap_mm:.2f} mm,0\r\n"
@@ -121,12 +144,17 @@ class RW402BPrinter:
         bitcmd = f"BITMAP {x},{y},{wb},{h},{mode},".encode("ascii")
         tail = b"\r\nPRINT 1\r\n"
         blob = header + bitcmd + packed + tail
-
+        t3 = time.monotonic()
         await self._send_chunks(addr, self._write_uuid, self._write_resp, blob)
+        send_ms = (time.monotonic() - t3) * 1000.0
+        total_ms = (time.monotonic() - t_start) * 1000.0
+        _dbg(f"phase: send took {send_ms:.1f}ms; total print call took {total_ms:.1f}ms")
 
     async def _scan_for_printer(self) -> Optional[str]:
-        print(f"Scanning for RW402B for {self.timeout:.1f}s…")
+        _dbg(f"Scanning for RW402B for {self.timeout:.1f}s…")
+        t0 = time.monotonic()
         devs = await BleakScanner.discover(timeout=self.timeout)
+        _dbg(f"scan: discover returned {len(devs)} devices in {(time.monotonic()-t0)*1000:.1f}ms")
         best = None
         best_rssi = -9999
         for d in devs:
@@ -143,9 +171,9 @@ class RW402BPrinter:
                 if rssi > best_rssi:
                     best = d
                     best_rssi = rssi
-                print(f"  candidate: {d.address}  RSSI={rssi}  Name={d.name}")
+                _dbg(f"  candidate: {d.address}  RSSI={rssi}  Name={d.name}")
         if best:
-            print(f"Using {best.address} ({best.name})")
+            _dbg(f"Using {best.address} ({best.name})")
             return best.address
         return None
 
@@ -153,16 +181,25 @@ class RW402BPrinter:
         for uuid in WRITE_CANDIDATES:
             for resp in (True, False):
                 try:
+                    t0 = time.monotonic()
                     async with BleakClient(addr, timeout=10) as client:
                         await client.write_gatt_char(uuid, b"", response=resp)
-                    print(f"Writable path OK: uuid={uuid}, response={resp}")
+                    _dbg(f"Writable path OK: uuid={uuid}, response={resp}, took {(time.monotonic()-t0)*1000:.1f}ms")
                     return uuid, resp
                 except Exception as e:
-                    print(f"Probe failed: uuid={uuid}, resp={resp}: {e}")
+                    _dbg(f"Probe failed: uuid={uuid}, resp={resp}: {e}")
         return None
 
     async def _send_chunks(self, addr: str, uuid: str, resp: bool, blob: bytes):
+        t0 = time.monotonic()
+        total = len(blob)
+        chunk = 20
+        count = (total + chunk - 1) // chunk
+        _dbg(f"send: total={total} bytes, chunks={count}, resp={resp}")
         async with BleakClient(addr, timeout=20) as client:
-            for i in range(0, len(blob), 20):
-                await client.write_gatt_char(uuid, blob[i:i+20], response=resp)
+            for i in range(0, total, chunk):
+                await client.write_gatt_char(uuid, blob[i:i+chunk], response=resp)
                 await asyncio.sleep(0.005)
+        dt = (time.monotonic() - t0)
+        rate = (total / dt) if dt > 0 else 0
+        _dbg(f"send: completed in {dt*1000:.1f}ms ({rate/1024:.2f} KiB/s)")
