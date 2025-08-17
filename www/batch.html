@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Batch Labels</title>
+  <link rel="stylesheet" href="/site.css">
+  <link rel="stylesheet" href="/nav.css">
+</head>
+<body>
+<script src="/nav.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', ()=> { window.renderSiteHeader(); });
+</script>
+
+<div class="container">
+  <h1>Batch Labels</h1>
+  <div class="form-grid">
+    <div class="form-group full-width">
+      <label>Load CSV</label>
+      <input type="file" id="csvFile" accept=".csv,text/csv">
+      <small>Columns: message, border_message, side_border, show_date, border, image, count</small>
+    </div>
+
+    <div class="form-group full-width" style="display:flex; gap:0.5rem;">
+      <button id="saveBtn" type="button">Save CSV</button>
+      <button id="submitBtn" type="button" class="submit-btn">Submit Batch</button>
+    </div>
+  </div>
+
+  <div style="overflow:auto;">
+    <table id="batchTable" class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Message</th>
+          <th>Border Text</th>
+          <th>Side Text</th>
+          <th>Show Date</th>
+          <th>Border</th>
+          <th>Image Path</th>
+          <th>Count</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <button id="addRowBtn" type="button">Add Row</button>
+  <div id="status"></div>
+</div>
+
+<script>
+(function(){
+  const tbody = document.getElementById('tbody');
+  const statusEl = document.getElementById('status');
+
+  function makeRow(data={}){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="row-num"></td>
+      <td><input type="text" value="${(data.message||'').replace(/"/g,'&quot;')}"></td>
+      <td><input type="text" value="${(data.border_message||'').replace(/"/g,'&quot;')}"></td>
+      <td><input type="text" value="${(data.side_border||'').replace(/"/g,'&quot;')}"></td>
+      <td style="text-align:center;"><input type="checkbox" ${data.show_date? 'checked':''}></td>
+      <td style="text-align:center;"><input type="checkbox" ${data.border!==false? 'checked':''}></td>
+      <td><input type="text" value="${(data.image||'').replace(/"/g,'&quot;')}"></td>
+      <td><input type="number" min="1" value="${Number(data.count||1)}" style="width:6ch;"></td>
+      <td><button type="button" class="remove">Remove</button></td>
+    `;
+    tbody.appendChild(tr);
+    renumber();
+  }
+
+  function renumber(){
+    [...tbody.querySelectorAll('tr')].forEach((tr,i)=>{
+      tr.querySelector('.row-num').textContent = i+1;
+    });
+  }
+
+  function getRows(){
+    return [...tbody.querySelectorAll('tr')].map(tr=>{
+      const tds = tr.querySelectorAll('td');
+      return {
+        message: tds[1].querySelector('input').value.trim(),
+        border_message: tds[2].querySelector('input').value.trim(),
+        side_border: tds[3].querySelector('input').value.trim(),
+        show_date: tds[4].querySelector('input').checked,
+        border: tds[5].querySelector('input').checked,
+        image: tds[6].querySelector('input').value.trim(),
+        count: Math.max(1, parseInt(tds[7].querySelector('input').value||'1',10)||1),
+      };
+    });
+  }
+
+  tbody.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button.remove');
+    if (!btn) return;
+    btn.closest('tr').remove();
+    renumber();
+  });
+
+  document.getElementById('addRowBtn').addEventListener('click', ()=> makeRow({ show_date: true, border: true, count: 1 }));
+
+  document.getElementById('csvFile').addEventListener('change', async (e)=>{
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const fd = new FormData();
+    fd.append('file', f);
+    try{
+      const r = await fetch('/api/batch/parse', { method: 'POST', body: fd });
+      const j = await r.json();
+      if (!r.ok){ throw new Error(j && (j.error || 'Parse failed')); }
+      tbody.innerHTML = '';
+      (j.rows||[]).forEach(makeRow);
+      statusEl.textContent = `Loaded ${j.rows.length} rows.`;
+    }catch(err){
+      statusEl.textContent = `Error: ${err.message||err}`;
+    }
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', ()=>{
+    const rows = getRows();
+    const headers = ['message','border_message','side_border','show_date','border','image','count'];
+    const lines = [headers.join(',')].concat(rows.map(r=> headers.map(h=>{
+      let v = r[h];
+      if (typeof v === 'boolean') v = v ? 'true' : 'false';
+      return '"' + String(v||'').replace(/"/g,'""') + '"';
+    }).join(',')));
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'labels.csv';
+    a.click();
+  });
+
+  document.getElementById('submitBtn').addEventListener('click', async ()=>{
+    const rows = getRows();
+    statusEl.textContent = 'Submitting batch…';
+    let ok = 0, fail = 0;
+    for (const row of rows){
+      try{
+        // Submit preview to bake template (optional), then print by path if available.
+        const prevRes = await fetch('/api/pi-label/preview', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: row.message,
+            border_message: row.border_message,
+            side_border: row.side_border,
+            show_date: !!row.show_date,
+            border: !!row.border,
+            image: row.image || undefined,
+            count: row.count
+          })
+        });
+        const prev = await prevRes.json().catch(()=>({}));
+        let payload;
+        if (prev && prev.preview_path){
+          payload = { path: prev.preview_path };
+        } else {
+          payload = {
+            message: row.message,
+            border_message: row.border_message,
+            side_border: row.side_border,
+            show_date: !!row.show_date,
+            border: !!row.border,
+            image: row.image || undefined,
+            count: row.count
+          };
+        }
+        const pr = await fetch('/api/pi-label/print', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!pr.ok){ throw new Error('print failed'); }
+        ok++;
+        statusEl.textContent = `Submitted ${ok} / ${rows.length} (fail ${fail})…`;
+      }catch(err){
+        fail++;
+        statusEl.textContent = `Error row ${ok+fail}: ${err.message||err}. Progress ${ok} / ${rows.length}`;
+      }
+    }
+    statusEl.textContent = `Done. ${ok} ok, ${fail} failed.`;
+  });
+
+  // Seed with one row
+  makeRow({ show_date: true, border: true, count: 1 });
+})();
+</script>
+</body>
+</html>

@@ -160,6 +160,46 @@ def upload_image_file():
         return jsonify({'error': 'Invalid file type. Please upload a PNG, JPG, or GIF.'}), 400
 
 
+@api_bp.post('/api/batch/parse')
+def api_batch_parse():
+    """Parse a CSV file into rows using Python's csv module for portability."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part in the request'}), 400
+    f = request.files['file']
+    if not f or not f.filename:
+        return jsonify({'error': 'No file selected'}), 400
+    try:
+        import csv, io
+        data = f.read()
+        text = data.decode('utf-8', errors='replace')
+        reader = csv.DictReader(io.StringIO(text))
+        rows = []
+        for row in reader:
+            norm = {}
+            for k, v in row.items():
+                if k is None:
+                    continue
+                key = str(k).strip().lower().replace(' ', '_')
+                val = (v or '').strip()
+                norm[key] = val
+            # Map to expected fields
+            def _bool(s):
+                return str(s).strip().lower() in ('1','true','yes','y','on')
+            out = {
+                'message': norm.get('message', ''),
+                'border_message': norm.get('border_message', norm.get('border', '')),
+                'side_border': norm.get('side_border', ''),
+                'show_date': _bool(norm.get('show_date', norm.get("today", ''))),
+                'border': _bool(norm.get('border_enabled', norm.get('border', 'true'))),
+                'image': norm.get('image', norm.get('image_path','')),
+                'count': int(norm.get('count', '1') or '1'),
+            }
+            rows.append(out)
+        return jsonify({'rows': rows, 'fields': reader.fieldnames}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @api_bp.post('/api/reprint')
 def api_reprint():
     data = request.get_json(silent=True) or {}

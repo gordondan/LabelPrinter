@@ -15,6 +15,7 @@
           <a href="/" data-nav>Home <span class="nav-hotkey">(h)</span></a>
           <a href="/custom-label.html" data-nav>Custom Label <span class="nav-hotkey">(c)</span></a>
           <a href="/recent.html" data-nav>Recent <span class="nav-hotkey">(r)</span></a>
+          <a href="/batch" data-nav>Batch <span class="nav-hotkey">(b)</span></a>
         </nav>
       </div>`;
 
@@ -31,6 +32,7 @@
       'h': '/',
       'c': '/custom-label.html',
       'r': '/recent.html',
+      'b': '/batch',
     };
     document.addEventListener('keydown', (ev) => {
       // Ignore when typing in inputs or editable elements
@@ -50,9 +52,18 @@
       try{
         const r = await fetch('/api/jobs/counts', { cache: 'no-store' });
         const j = await r.json();
-        const n = (j && (j.total_active || 0)) || 0;
-        if (n > 0){ badge.textContent = `(${n}) Jobs running`; badge.style.display = ''; }
-        else { badge.textContent = ''; badge.style.display = 'none'; }
+        const queued = (j && typeof j.queued === 'number') ? j.queued : ((j && j.queued) ? parseInt(j.queued, 10) : 0);
+        const running = (j && typeof j.running === 'number') ? j.running : ((j && j.running) ? parseInt(j.running, 10) : 0);
+        if (!queued && !running){
+          badge.textContent = '';
+          badge.style.display = 'none';
+          return;
+        }
+        let parts = [];
+        if (queued > 0) parts.push(`${queued} queued`);
+        if (running > 0) parts.push(`${running} running`);
+        badge.textContent = parts.join(' ');
+        badge.style.display = '';
       }catch{}
     }
     refreshJobs();
