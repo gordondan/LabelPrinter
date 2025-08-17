@@ -1,13 +1,11 @@
 {
   "original_request": {
-    "message": "Bread Expires",
+    "message": "f",
     "count": "1",
-    "date": "2025-08-31",
     "preview_only": true
   },
   "normalized_template": {
-    "message": "Bread Expires",
-    "date": "2025-08-31"
+    "message": "f"
   },
-  "timestamp": "2025-08-16T15:11:59.599894"
+  "timestamp": "2025-08-17T06:04:55.614529"
 }

@@ -1,14 +1,14 @@
 # LabelPrinter Server — Running with Gunicorn and systemd
 
-This repo includes a small Flask app in `server.py` that exposes HTTP endpoints to run `pi-label-printer.py` with various options. This guide shows how to:
+This repo includes a small Flask app in `server.py` that exposes HTTP endpoints to run `label-printer.py` with various options. This guide shows how to:
 - Run the server locally for testing
 - Run it in production with Gunicorn
 - Install it as a systemd service
 
 ## Endpoints
 - `GET /app/pi-label` — Simple HTML form UI
-- `GET /app/pi-label/options` — JSON of supported CLI flags for `pi-label-printer.py`
-- `POST /app/pi-label/print` — Executes `pi-label-printer.py` with the provided JSON payload
+- `GET /app/pi-label/options` — JSON of supported CLI flags for `label-printer.py`
+- `POST /app/pi-label/print` — Executes `label-printer.py` with the provided JSON payload
 
 ## Prerequisites
 - Python 3.9+

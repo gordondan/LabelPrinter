@@ -1,7 +1,7 @@
 """
 windows_printer.py
 -----------------
-Contains all Windows-specific printer logic extracted from pi-label-printer.py.
+Contains all Windows-specific printer logic extracted from label-printer.py.
 """
 
 try:

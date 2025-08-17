@@ -61,7 +61,7 @@ fi
 # Curated list of files and directories to deploy
 # Adjust as needed for your environment.
 FILES_TO_SYNC=(
-  "pi-label-printer.py"
+  "label-printer.py"
   "logger.py"
   "config.py"
   "rw402b_ble"

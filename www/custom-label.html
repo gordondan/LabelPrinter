@@ -25,52 +25,56 @@
                     <input type="text" id="message" name="message" placeholder="e.g., It's leftovers enjoy it!">
                 </div>
 
-                <!-- Border Messages -->
-                <div class="form-group">
-                    <label for="border_message">Top/Bottom Border Text</label>
-                    <input type="text" id="border_message" name="border_message">
-                </div>
-                <div class="form-group">
-                    <label for="side_border">Side Border Text</label>
-                    <input type="text" id="side_border" name="side_border">
-                </div>
+                <!-- Expandable Advanced Options -->
+                <div class="full-width">
+                  <details>
+                    <summary style="cursor:pointer;font-weight:700;">More options</summary>
+                    <div class="form-grid" style="margin-top:1rem;">
+                      <!-- Border Messages -->
+                      <div class="form-group">
+                          <label for="border_message">Top/Bottom Border Text</label>
+                          <input type="text" id="border_message" name="border_message">
+                      </div>
+                      <div class="form-group">
+                          <label for="side_border">Side Border Text</label>
+                          <input type="text" id="side_border" name="side_border">
+                      </div>
 
-                <!-- Count and Date -->
-                <div class="form-group">
-                    <label for="count">Count</label>
-                    <input type="number" id="count" name="count" value="1" min="1">
-                </div>
-                <div class="form-group">
-                    <label for="date">Date (optional)</label>
-                    <input type="date" id="date" name="date">
-                </div>
+                      <!-- Count and Date -->
+                      <div class="form-group">
+                          <label for="count">Count</label>
+                          <input type="number" id="count" name="count" value="1" min="1">
+                      </div>
+                      <div class="form-group">
+                          <label for="date">Date (optional)</label>
+                          <input type="date" id="date" name="date">
+                      </div>
 
-                <!-- Image Upload (Optional) -->
-                <div class="form-group full-width">
-                    <label>Image (optional)</label>
-                    
-                    <!-- This is the initial upload box -->
-                    <label for="imageUpload" class="file-input-wrapper" id="fileInputWrapper">
-                        <div>Click to select an image</div>
-                        <div id="fileName">No file chosen</div>
-                    </label>
-                    <input type="file" id="imageUpload" name="imageFile" accept="image/png, image/jpeg, image/gif" style="display:none;">
+                      <!-- Image Upload (Optional) -->
+                      <div class="form-group full-width">
+                          <label>Image (optional)</label>
+                          <label for="imageUpload" class="file-input-wrapper" id="fileInputWrapper">
+                              <div>Click to select an image</div>
+                              <div id="fileName">No file chosen</div>
+                          </label>
+                          <input type="file" id="imageUpload" name="imageFile" accept="image/png, image/jpeg, image/gif" style="display:none;">
+                          <div id="uploadPreviewContainer" style="display: none;">
+                              <img id="uploadPreviewImage" src="#" alt="Your selected image">
+                              <button type="button" id="removeImageButton">Remove Image</button>
+                          </div>
+                      </div>
 
-                    <!-- This container will show the preview and remove button -->
-                    <div id="uploadPreviewContainer" style="display: none;">
-                        <img id="uploadPreviewImage" src="#" alt="Your selected image">
-                        <button type="button" id="removeImageButton">Remove Image</button>
+                      <!-- Boolean Flags -->
+                      <div class="form-group checkbox-group">
+                          <input type="checkbox" id="show_date" name="show_date">
+                          <label for="show_date">Include Today's Date</label>
+                      </div>
+                      <div class="form-group checkbox-group">
+                          <input type="checkbox" id="preview_only" name="preview_only">
+                          <label for="preview_only">Preview Only (no printing)</label>
+                      </div>
                     </div>
-                </div>
-                
-                <!-- Boolean Flags -->
-                <div class="form-group checkbox-group">
-                    <input type="checkbox" id="show_date" name="show_date">
-                    <label for="show_date">Include Today's Date</label>
-                </div>
-                <div class="form-group checkbox-group">
-                    <input type="checkbox" id="preview_only" name="preview_only" checked>
-                    <label for="preview_only">Preview Only (no printing)</label>
+                  </details>
                 </div>
             </div>
 
@@ -102,6 +106,7 @@
     let debounceTimer = null;
     let previewReady = false;
     let lastPreviewPayload = null; // The payload used to create the preview
+    let lastPreviewPath = null; // Relative path to preview PNG for printing
     let uploadedImagePath = null;
     let uploadedImageSig = null; // Track file identity to avoid re-uploads (name+size+mtime)
 
@@ -134,6 +139,16 @@
         return uploadedImagePath;
     }
 
+    function normalizeDateString(v) {
+        if (!v) return '';
+        // Accept mm/dd/yyyy and convert to yyyy-mm-dd
+        if (v.includes('/')) {
+            const [mm, dd, yyyy] = v.split('/');
+            if (yyyy && mm && dd) return `${yyyy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+        }
+        return v; // assume already yyyy-mm-dd
+    }
+
     function buildPayload({ previewOnly }) {
         const printPayload = {};
         const formData = new FormData(printForm);
@@ -144,7 +159,7 @@
                 continue;
             }
             if (typeof value === 'string' && value.trim() !== '') {
-                printPayload[key] = value;
+                printPayload[key] = key === 'date' ? normalizeDateString(value.trim()) : value.trim();
             }
         }
         // Force preview_only flag as requested
@@ -153,20 +168,45 @@
         return printPayload;
     }
 
+    async function pollForPreview(timeoutMs = 2000, intervalMs = 250) {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            // Try to load the preview image; if it loads, we’re done
+            const testUrl = `/preview.png?ts=${Date.now()}`;
+            try {
+                await new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve();
+                    img.onerror = reject;
+                    img.src = testUrl;
+                });
+                return testUrl;
+            } catch {}
+            await new Promise(r => setTimeout(r, intervalMs));
+        }
+        return null;
+    }
+
     async function generatePreview() {
         try {
             updateStatus('Generating preview…', 'success');
             // Ensure image is uploaded if present
             await ensureImageUploaded();
             const payload = buildPayload({ previewOnly: true });
-            const res = await fetch('/api/pi-label/print', {
+            const res = await fetch('/api/pi-label/preview', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
             const body = await res.json().catch(() => ({ error: 'Invalid response' }));
             if (!res.ok) throw new Error(body.errors ? body.errors.join(', ') : body.error || 'Preview failed.');
-            if (!body.preview_url) throw new Error('No preview returned.');
-            previewImage.src = `${body.preview_url}&t=${Date.now()}`;
+            let url = body.preview_url;
+            lastPreviewPath = body.preview_path || null;
+            if (!url) {
+                // Fallback: poll for preview.png briefly
+                url = await pollForPreview();
+            }
+            if (!url) throw new Error('No preview available.');
+            previewImage.src = `${url}&t=${Date.now()}`;
             previewImage.style.display = 'block';
             previewReady = true;
             lastPreviewPayload = payload;
@@ -174,6 +214,7 @@
         } catch (err) {
             previewReady = false;
             lastPreviewPayload = null;
+            lastPreviewPath = null;
             updateStatus(`Error: ${err.message}`, 'error');
             previewImage.style.display = 'none';
         } finally {
@@ -240,16 +281,17 @@
         submitButton.textContent = 'Printing…';
 
         try {
-            // Reuse last preview payload but ensure preview_only is false
-            const payload = { ...(lastPreviewPayload || buildPayload({ previewOnly: false })) };
-            delete payload.preview_only;
-            // Ensure image path is included if available
-            if (uploadedImagePath) payload.image = uploadedImagePath;
+            // Prefer printing by preview path if available
+            const printPayload = lastPreviewPath ? { path: lastPreviewPath } : { ...(lastPreviewPayload || buildPayload({ previewOnly: false })) };
+            if (!lastPreviewPath) {
+                delete printPayload.preview_only;
+                if (uploadedImagePath) printPayload.image = uploadedImagePath;
+            }
 
             const printResponse = await fetch('/api/pi-label/print', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(printPayload)
             });
             const printResult = await printResponse.json().catch(() => ({ error: 'Invalid response' }));
             if (!printResponse.ok) {
