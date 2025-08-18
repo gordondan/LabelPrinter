@@ -14,6 +14,7 @@ DEBUG = os.getenv('RW402B_DEBUG', '1').lower() in ('1', 'true', 'yes', 'y')
 # Tunables: chunk size (bytes) and per-chunk sleep in milliseconds
 CHUNK_SIZE = max(1, int(os.getenv('RW402B_CHUNK', '20') or '20'))
 THROTTLE_MS = max(0, int(os.getenv('RW402B_THROTTLE_MS', '0') or '0'))
+PREFER_RESP = os.getenv('RW402B_PREFER_RESP', '0').lower() in ('1','true','yes','y')
 
 def _dbg(msg: str):
     if DEBUG:
@@ -245,8 +246,9 @@ class RW402BPrinter:
 
     async def _choose_write_path(self, addr: str) -> Optional[Tuple[str, bool]]:
         for uuid in WRITE_CANDIDATES:
-            # Prefer write without response for throughput; fall back to with response
-            for resp in (False, True):
+            # Order depends on preference; default to no-response first
+            order = (True, False) if PREFER_RESP else (False, True)
+            for resp in order:
                 try:
                     t0 = time.monotonic()
                     async with BleakClient(addr, timeout=10) as client:
@@ -273,6 +275,8 @@ class RW402BPrinter:
                     else:
                         # Small yield to keep loop responsive
                         await asyncio.sleep(0)
+            # Give the device a brief moment to process before disconnecting
+            await asyncio.sleep(0.2 if not resp else 0.05)
         dt = (time.monotonic() - t0)
         rate = (total / dt) if dt > 0 else 0
         _dbg(f"send: completed in {dt*1000:.1f}ms ({rate/1024:.2f} KiB/s)")
