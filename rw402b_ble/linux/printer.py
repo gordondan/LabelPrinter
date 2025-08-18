@@ -115,6 +115,39 @@ class RW402BPrinter:
             img, label_w_mm, label_h_mm, gap_mm, density, speed, direction, x, y, mode
         ))
 
+    def probe(self) -> bool:
+        """Quiet connectivity test at startup. Returns True if a writable path is found.
+        Caches discovered MAC and write UUID for faster subsequent prints."""
+        try:
+            return asyncio.run(self._async_probe())
+        except Exception as e:
+            _dbg(f"probe failed: {e}")
+            return False
+
+    async def _async_probe(self) -> bool:
+        addr = self.addr
+        if not addr:
+            t0 = time.monotonic()
+            addr = await self._scan_for_printer()
+            _dbg(f"probe: initial scan took {(time.monotonic()-t0)*1000:.1f}ms; addr={addr}")
+            if not addr:
+                return False
+            self.addr = addr
+        # Try to establish a writable path; prefer no-response
+        path = await self._choose_write_path(addr)
+        if not path:
+            # If we had a configured addr and probing failed, try one scan and retry
+            t0 = time.monotonic()
+            new_addr = await self._scan_for_printer()
+            _dbg(f"probe: retry scan took {(time.monotonic()-t0)*1000:.1f}ms; addr={new_addr}")
+            if new_addr:
+                self.addr = new_addr
+                path = await self._choose_write_path(new_addr)
+        if not path:
+            return False
+        self._write_uuid, self._write_resp = path
+        return True
+
     async def _async_print_pil_image(self, img, label_w_mm: float, label_h_mm: float, gap_mm: float,
                                      density: int, speed: int, direction: int,
                                      x: int, y: int, mode: int) -> None:

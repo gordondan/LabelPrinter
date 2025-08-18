@@ -64,6 +64,19 @@ def create_app() -> Flask:
     except Exception:
         pass
 
+    # Quiet BLE probe at startup (Linux) to cache MAC/write path if available
+    try:
+        import sys as _sys
+        if _sys.platform.lower().startswith('linux'):
+            from .services.printing import load_printer_config
+            from rw402b_ble.printer import RW402BPrinter as _P
+            cfg, pcfg = load_printer_config()
+            ble_mac = pcfg.get('ble_mac') if pcfg else None
+            p = _P(addr=ble_mac)
+            threading.Thread(target=lambda: p.probe(), name='ble-probe', daemon=True).start()
+    except Exception:
+        pass
+
     # GPIO listener moved to a feature module and disabled by default.
     # To enable, we create a manager that will start/stop the listener based on job activity and config.
     try:
