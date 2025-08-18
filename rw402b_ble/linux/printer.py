@@ -11,6 +11,9 @@ from bleak import BleakScanner, BleakClient
 
 # Enable verbose timing/debug by environment variable (default on)
 DEBUG = os.getenv('RW402B_DEBUG', '1').lower() in ('1', 'true', 'yes', 'y')
+# Tunables: chunk size (bytes) and per-chunk sleep in milliseconds
+CHUNK_SIZE = max(1, int(os.getenv('RW402B_CHUNK', '20') or '20'))
+THROTTLE_MS = max(0, int(os.getenv('RW402B_THROTTLE_MS', '0') or '0'))
 
 def _dbg(msg: str):
     if DEBUG:
@@ -116,20 +119,29 @@ class RW402BPrinter:
                                      density: int, speed: int, direction: int,
                                      x: int, y: int, mode: int) -> None:
         t_start = time.monotonic()
-        t0 = time.monotonic()
-        addr = self.addr or await self._scan_for_printer()
-        _dbg(f"phase: scan took {(time.monotonic()-t0)*1000:.1f}ms")
+        # Use configured MAC if provided; scan only if missing or on failure.
+        addr = self.addr
+        scanned_once = False
+
+        async def ensure_write_path(cur_addr: str):
+            if not self._write_uuid:
+                t1 = time.monotonic()
+                path = await self._choose_write_path(cur_addr)
+                _dbg(f"phase: choose_write_path took {(time.monotonic()-t1)*1000:.1f}ms")
+                if not path:
+                    raise RuntimeError("No writable BLE characteristic found on RW402B.")
+                self._write_uuid, self._write_resp = path
+
+        # If we don't have an address, scan once up front
         if not addr:
-            raise RuntimeError("RW402B not found during scan.")
+            t0 = time.monotonic()
+            addr = await self._scan_for_printer()
+            _dbg(f"phase: scan took {(time.monotonic()-t0)*1000:.1f}ms")
+            scanned_once = True
+            if not addr:
+                raise RuntimeError("RW402B not found during scan.")
 
-        if not self._write_uuid:
-            t1 = time.monotonic()
-            path = await self._choose_write_path(addr)
-            _dbg(f"phase: choose_write_path took {(time.monotonic()-t1)*1000:.1f}ms")
-            if not path:
-                raise RuntimeError("No writable BLE characteristic found on RW402B.")
-            self._write_uuid, self._write_resp = path
-
+        # Build payload
         t2 = time.monotonic()
         packed, wb, h = _pil_to_tspl_bitmap(img, label_w_mm, label_h_mm, self.dpi, self.invert)
         _dbg(f"phase: bitmap conversion took {(time.monotonic()-t2)*1000:.1f}ms; payload={len(packed)} bytes")
@@ -144,11 +156,32 @@ class RW402BPrinter:
         bitcmd = f"BITMAP {x},{y},{wb},{h},{mode},".encode("ascii")
         tail = b"\r\nPRINT 1\r\n"
         blob = header + bitcmd + packed + tail
-        t3 = time.monotonic()
-        await self._send_chunks(addr, self._write_uuid, self._write_resp, blob)
-        send_ms = (time.monotonic() - t3) * 1000.0
-        total_ms = (time.monotonic() - t_start) * 1000.0
-        _dbg(f"phase: send took {send_ms:.1f}ms; total print call took {total_ms:.1f}ms")
+
+        async def try_send(cur_addr: str):
+            # Ensure we have a write path for this address
+            await ensure_write_path(cur_addr)
+            t3 = time.monotonic()
+            await self._send_chunks(cur_addr, self._write_uuid, self._write_resp, blob)
+            send_ms = (time.monotonic() - t3) * 1000.0
+            total_ms = (time.monotonic() - t_start) * 1000.0
+            _dbg(f"phase: send took {send_ms:.1f}ms; total print call took {total_ms:.1f}ms")
+
+        try:
+            await try_send(addr)
+        except Exception as e:
+            # On failure, scan once (if not already), reset path, and retry
+            if not scanned_once:
+                _dbg(f"send/connect failed using configured addr; scanning to retry… ({e})")
+                t0 = time.monotonic()
+                new_addr = await self._scan_for_printer()
+                _dbg(f"phase: scan (retry) took {(time.monotonic()-t0)*1000:.1f}ms")
+                if new_addr:
+                    addr = new_addr
+                    self._write_uuid = None  # force re-probe for new address
+                    await try_send(addr)
+                    return
+            # If already scanned once or scan failed, re-raise
+            raise
 
     async def _scan_for_printer(self) -> Optional[str]:
         _dbg(f"Scanning for RW402B for {self.timeout:.1f}s…")
@@ -179,7 +212,8 @@ class RW402BPrinter:
 
     async def _choose_write_path(self, addr: str) -> Optional[Tuple[str, bool]]:
         for uuid in WRITE_CANDIDATES:
-            for resp in (True, False):
+            # Prefer write without response for throughput; fall back to with response
+            for resp in (False, True):
                 try:
                     t0 = time.monotonic()
                     async with BleakClient(addr, timeout=10) as client:
@@ -193,13 +227,19 @@ class RW402BPrinter:
     async def _send_chunks(self, addr: str, uuid: str, resp: bool, blob: bytes):
         t0 = time.monotonic()
         total = len(blob)
-        chunk = 20
+        chunk = CHUNK_SIZE
         count = (total + chunk - 1) // chunk
-        _dbg(f"send: total={total} bytes, chunks={count}, resp={resp}")
+        _dbg(f"send: total={total} bytes, chunks={count}, chunk={chunk}, resp={resp}, throttle_ms={THROTTLE_MS}")
         async with BleakClient(addr, timeout=20) as client:
             for i in range(0, total, chunk):
                 await client.write_gatt_char(uuid, blob[i:i+chunk], response=resp)
-                await asyncio.sleep(0.005)
+                # If writing without response, push as fast as possible (optionally throttle if configured)
+                if resp:
+                    if THROTTLE_MS:
+                        await asyncio.sleep(THROTTLE_MS / 1000.0)
+                    else:
+                        # Small yield to keep loop responsive
+                        await asyncio.sleep(0)
         dt = (time.monotonic() - t0)
         rate = (total / dt) if dt > 0 else 0
         _dbg(f"send: completed in {dt*1000:.1f}ms ({rate/1024:.2f} KiB/s)")
