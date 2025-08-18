@@ -72,7 +72,7 @@ def create_app() -> Flask:
             from rw402b_ble.printer import RW402BPrinter as _P
             cfg, pcfg = load_printer_config()
             ble_mac = pcfg.get('ble_mac') if pcfg else None
-            p = _P(addr=ble_mac)
+            p = _P(addr=ble_mac, prefer_resp=True)
             threading.Thread(target=lambda: p.probe(), name='ble-probe', daemon=True).start()
     except Exception:
         pass

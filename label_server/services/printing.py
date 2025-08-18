@@ -75,17 +75,26 @@ def print_png_via_ble(p: Path):
         direction = int(pcfg.get('direction', 1))
         invert = bool(pcfg.get('invert', True))
         ble_mac = pcfg.get('ble_mac') or None
+        # Optional BLE tunables
+        prefer_resp = bool(pcfg.get('prefer_write_with_response', True))
+        throttle_ms = int(pcfg.get('write_throttle_ms', 0))
+        chunk_size = int(pcfg.get('write_chunk_size', 20))
     except Exception as e:
         return False, {'error': f'Invalid printer config: {e}'}, 500
 
     try:
         t0 = time.perf_counter()
-        # On Windows, RW402BPrinter may accept a config dict; on Linux it will ignore extra kwargs
+        # On Windows, RW402BPrinter may accept a config dict; on Linux we pass BLE tunables
         extra_kwargs = {}
         if sys.platform.lower().startswith('win'):
             extra_kwargs['config'] = cfg or {}
-        pble = RW402BPrinter(addr=ble_mac, timeout=float(pcfg.get('bluetooth_wait_time', 4.0)),
-                              dpi=dpi, invert=invert, **extra_kwargs)
+            pble = RW402BPrinter(addr=ble_mac, timeout=float(pcfg.get('bluetooth_wait_time', 4.0)),
+                                 dpi=dpi, invert=invert, **extra_kwargs)
+        else:
+            pble = RW402BPrinter(addr=ble_mac, timeout=float(pcfg.get('bluetooth_wait_time', 4.0)),
+                                 dpi=dpi, invert=invert,
+                                 prefer_resp=prefer_resp, throttle_ms=throttle_ms, chunk_size=chunk_size,
+                                 **extra_kwargs)
         # Choose printer name on Windows (use configured default_printer); Linux ignores this parameter
         printer_name = None
         if sys.platform.lower().startswith('win'):

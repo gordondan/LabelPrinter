@@ -11,7 +11,7 @@ from bleak import BleakScanner, BleakClient
 
 # Enable verbose timing/debug by environment variable (default on)
 DEBUG = os.getenv('RW402B_DEBUG', '1').lower() in ('1', 'true', 'yes', 'y')
-# Tunables: chunk size (bytes) and per-chunk sleep in milliseconds
+# Tunables (defaults via env); can be overridden per instance
 CHUNK_SIZE = max(1, int(os.getenv('RW402B_CHUNK', '20') or '20'))
 THROTTLE_MS = max(0, int(os.getenv('RW402B_THROTTLE_MS', '0') or '0'))
 PREFER_RESP = os.getenv('RW402B_PREFER_RESP', '0').lower() in ('1','true','yes','y')
@@ -101,13 +101,26 @@ class RW402BPrinter:
     """
 
     def __init__(self, addr: Optional[str] = None, timeout: float = 4.0,
-                 dpi: int = 203, invert: bool = True):
+                 dpi: int = 203, invert: bool = True,
+                 prefer_resp: Optional[bool] = None,
+                 chunk_size: Optional[int] = None,
+                 throttle_ms: Optional[int] = None):
         self.addr = addr
         self.timeout = timeout
         self.dpi = dpi
         self.invert = invert
         self._write_uuid: Optional[str] = None
         self._write_resp: bool = True
+        # Per-instance tunables
+        self._prefer_resp: bool = (PREFER_RESP if prefer_resp is None else bool(prefer_resp))
+        try:
+            self._chunk_size: int = max(1, int(CHUNK_SIZE if chunk_size is None else int(chunk_size)))
+        except Exception:
+            self._chunk_size = CHUNK_SIZE
+        try:
+            self._throttle_ms: int = max(0, int(THROTTLE_MS if throttle_ms is None else int(throttle_ms)))
+        except Exception:
+            self._throttle_ms = THROTTLE_MS
 
     def print_pil_image(self, img, label_w_mm: float, label_h_mm: float, gap_mm: float = 3.0,
                         density: int = 8, speed: int = 4, direction: int = 1,
@@ -246,13 +259,13 @@ class RW402BPrinter:
 
     async def _choose_write_path(self, addr: str) -> Optional[Tuple[str, bool]]:
         for uuid in WRITE_CANDIDATES:
-            # Order depends on preference; default to no-response first
-            order = (True, False) if PREFER_RESP else (False, True)
+            # Order depends on preference (default comes from env; can be overridden per instance)
+            order = (True, False) if self._prefer_resp else (False, True)
             for resp in order:
                 try:
                     t0 = time.monotonic()
                     async with BleakClient(addr, timeout=10) as client:
-                        await client.write_gatt_char(uuid, b"", response=resp)
+                            await client.write_gatt_char(uuid, b"", response=resp)
                     _dbg(f"Writable path OK: uuid={uuid}, response={resp}, took {(time.monotonic()-t0)*1000:.1f}ms")
                     return uuid, resp
                 except Exception as e:
@@ -262,16 +275,16 @@ class RW402BPrinter:
     async def _send_chunks(self, addr: str, uuid: str, resp: bool, blob: bytes):
         t0 = time.monotonic()
         total = len(blob)
-        chunk = CHUNK_SIZE
+        chunk = self._chunk_size
         count = (total + chunk - 1) // chunk
-        _dbg(f"send: total={total} bytes, chunks={count}, chunk={chunk}, resp={resp}, throttle_ms={THROTTLE_MS}")
+        _dbg(f"send: total={total} bytes, chunks={count}, chunk={chunk}, resp={resp}, throttle_ms={self._throttle_ms}")
         async with BleakClient(addr, timeout=20) as client:
             for i in range(0, total, chunk):
                 await client.write_gatt_char(uuid, blob[i:i+chunk], response=resp)
                 # If writing without response, push as fast as possible (optionally throttle if configured)
                 if resp:
-                    if THROTTLE_MS:
-                        await asyncio.sleep(THROTTLE_MS / 1000.0)
+                    if self._throttle_ms:
+                        await asyncio.sleep(self._throttle_ms / 1000.0)
                     else:
                         # Small yield to keep loop responsive
                         await asyncio.sleep(0)
