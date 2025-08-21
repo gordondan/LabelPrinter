@@ -40,9 +40,10 @@
                             const statusRes = await fetch('/api/today/status');
                             const st = await statusRes.json().catch(()=>({ready:false}));
                             if (!st.ready || !st.rel_path) throw new Error('Today label not ready');
+                            const selectedPrinter = document.getElementById('printer-select').value;
                             const printRes = await fetch('/api/pi-label/print', {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ path: st.rel_path })
+                                body: JSON.stringify({ path: st.rel_path, printer: selectedPrinter })
                             });
                             const printBody = await printRes.json().catch(()=>({error:'Invalid response'}));
                             if (!printRes.ok && !printBody.queued) throw new Error(printBody.errors ? printBody.errors.join(', ') : (printBody.error || 'Print failed'));
@@ -94,9 +95,10 @@
                                 const statusRes = await fetch('/api/today/status');
                                 const st = await statusRes.json().catch(()=>({ready:false}));
                                 if (!st.ready || !st.rel_path) throw new Error('Today label not ready');
+                                const selectedPrinter = document.getElementById('printer-select').value;
                                 const printRes = await fetch('/api/pi-label/print', {
                                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ path: st.rel_path })
+                                    body: JSON.stringify({ path: st.rel_path, printer: selectedPrinter })
                                 });
                                 const printBody = await printRes.json().catch(()=>({error:'Invalid response'}));
                                 if (!printRes.ok) throw new Error(printBody.errors ? printBody.errors.join(', ') : (printBody.error || 'Print failed'));

@@ -48,15 +48,18 @@
 
     // Poll job counts and update header badge
     const badge = header.querySelector('#jobsBadge');
+    let jobsTimer = null;
     async function refreshJobs(){
       try{
         const r = await fetch('/api/jobs/counts', { cache: 'no-store' });
         const j = await r.json();
         const queued = (j && typeof j.queued === 'number') ? j.queued : ((j && j.queued) ? parseInt(j.queued, 10) : 0);
         const running = (j && typeof j.running === 'number') ? j.running : ((j && j.running) ? parseInt(j.running, 10) : 0);
+        const active = (queued||0) + (running||0);
         if (!queued && !running){
           badge.textContent = '';
           badge.style.display = 'none';
+          if (jobsTimer){ clearInterval(jobsTimer); jobsTimer = null; }
           return;
         }
         let parts = [];
@@ -64,10 +67,16 @@
         if (running > 0) parts.push(`${running} running`);
         badge.textContent = parts.join(' ');
         badge.style.display = '';
+        if (!jobsTimer){
+          // Start a slow poll while there is active work
+          jobsTimer = setInterval(refreshJobs, 15000);
+        }
       }catch{}
     }
+    // One immediate refresh on load; interval starts only when active
     refreshJobs();
-  setInterval(refreshJobs, 3000);
+    // Expose a manual bump so pages can trigger a one-shot refresh when they enqueue work
+    window.bumpJobsBadge = () => { try { refreshJobs(); } catch{} };
   }
 
   window.renderSiteHeader = renderHeader;

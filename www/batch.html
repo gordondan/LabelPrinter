@@ -138,6 +138,7 @@
   document.getElementById('submitBtn').addEventListener('click', async ()=>{
     const rows = getRows();
     statusEl.textContent = 'Submitting batch…';
+  if (window.bumpJobsBadge) window.bumpJobsBadge();
     let ok = 0, fail = 0;
     for (const row of rows){
       try{

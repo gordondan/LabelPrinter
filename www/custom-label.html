@@ -372,6 +372,8 @@
                 if (uploadedImagePath) printPayload.image = uploadedImagePath;
             }
 
+            // Nudge the header badge to refresh now that we’re queuing a job
+            if (window.bumpJobsBadge) window.bumpJobsBadge();
             const printResponse = await fetch('/api/pi-label/print', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

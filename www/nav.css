@@ -73,3 +73,37 @@ body.has-site-header { padding-top: var(--nav-height); }
   font-weight: 600;
   margin-left: 4px;
 }
+
+.printer-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding-left: 16px;
+}
+
+.printer-selector label {
+  font-weight: 600;
+  color: var(--nav-fg);
+}
+
+.printer-selector select {
+  padding: 6px 10px;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 6px;
+  background: white;
+  color: var(--nav-fg);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.printer-selector select:hover {
+  border-color: var(--nav-accent);
+}
+
+.printer-selector select:focus {
+  outline: none;
+  border-color: var(--nav-accent);
+  box-shadow: 0 0 0 3px rgba(65,105,225,0.1);
+}

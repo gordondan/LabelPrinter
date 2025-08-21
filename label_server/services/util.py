@@ -25,23 +25,24 @@ def past_images_dir() -> Path:
 
 
 def find_latest_preview() -> Path | None:
-    candidates: list[Path] = []
-    root_preview = BASE_DIR / 'label_preview.png'
-    if root_preview.is_file():
-        candidates.append(root_preview)
-
-    ldir = logs_dir()
-    if ldir.is_dir():
-        try:
-            for p in ldir.rglob('label_preview.png'):
-                if p.is_file():
-                    candidates.append(p)
-        except Exception:
-            pass
-
-    if not candidates:
+    """Find the most recent preview from the recent folder only."""
+    base = past_images_dir()
+    if not base.is_dir():
         return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+    newest = None
+    newest_ts = -1
+    try:
+        for p in base.rglob('label_preview.png'):
+            try:
+                st = p.stat()
+            except Exception:
+                continue
+            if st.st_mtime > newest_ts:
+                newest_ts = st.st_mtime
+                newest = p
+    except Exception:
+        return None
+    return newest
 
 
 def find_latest_metrics():
@@ -72,8 +73,6 @@ def parse_metrics_from_stdout(stdout: str):
 
 def list_recent_previews(limit: int = 100):
     base = past_images_dir()
-    if not base.is_dir():
-        base = logs_dir()
     items: list[dict] = []
     if not base.is_dir():
         return []

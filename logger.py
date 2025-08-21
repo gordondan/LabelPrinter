@@ -158,34 +158,23 @@ class LabelPrinterLogger:
     
     def save_label_preview(self, image, filename="label_preview.png"):
         """
-        Save label preview image to log directory.
-        
-        Args:
-            image: PIL Image object
-            filename: Filename for preview
+        Save label preview image only under the recent directory structure, not in logs.
         """
         if not self.current_log_dir:
             self.create_log_session()
-        
-        preview_path = self.current_log_dir / filename
+
         try:
-            image.save(preview_path)
-            self.log(f"Preview saved: {preview_path}")
-            # Also mirror into recent using the same folder structure under logs
-            try:
-                # Compute the relative session subpath under the base logs directory
-                rel = self.current_log_dir.relative_to(self.base_dir)
-                archive_root = self.base_dir.parent / "recent"
-                archive_dir = archive_root / rel
-                archive_dir.mkdir(parents=True, exist_ok=True)
-                archive_path = archive_dir / filename
-                image.save(archive_path)
-                self.log(f"Preview archived: {archive_path}")
-            except Exception as e:
-                self.log(f"WARNING: Could not mirror preview to recent: {e}")
-            return preview_path
+            # Compute the relative session subpath under the base logs directory
+            rel = self.current_log_dir.relative_to(self.base_dir)
+            archive_root = self.base_dir.parent / "recent"
+            archive_dir = archive_root / rel
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            archive_path = archive_dir / filename
+            image.save(archive_path)
+            self.log(f"Preview archived: {archive_path}")
+            return archive_path
         except Exception as e:
-            self.log_error(f"Could not save preview to {preview_path}", e)
+            self.log_error("Could not save preview image", e)
             return None
     
     def get_log_directory(self):

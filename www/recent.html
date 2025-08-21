@@ -21,9 +21,10 @@
     }
 
     async function doReprint(item){
+      const selectedPrinter = document.getElementById('printer-select').value;
       const res = await fetch('/api/reprint', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: item.path })
+        body: JSON.stringify({ path: item.path, printer: selectedPrinter })
       });
       try {
         const body = await res.json();

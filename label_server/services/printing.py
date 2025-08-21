@@ -37,7 +37,7 @@ essential_defaults = {
 }
 
 
-def load_printer_config():
+def load_printer_config(printer_name: str = None):
     import json as _json
     cfg_path = get_config_file_for_os()
     if not cfg_path.is_file():
@@ -46,17 +46,23 @@ def load_printer_config():
         with open(cfg_path, 'r', encoding='utf-8') as f:
             cfg = _json.load(f)
         printers = cfg.get('printers') or {}
-        pcfg = printers.get('RW402B') or essential_defaults
+        # Use specified printer or default
+        if printer_name and printer_name in printers:
+            pcfg = printers.get(printer_name)
+        else:
+            # Use default printer or fallback to RW402B
+            default_printer = cfg.get('default_printer', 'RW402B')
+            pcfg = printers.get(default_printer) or printers.get('RW402B') or essential_defaults
         return cfg, pcfg
     except Exception:
         return None, None
 
 
-def print_png_via_ble(p: Path):
+def print_png_via_ble(p: Path, printer_name: str = None):
     if RW402BPrinter is None:
         return False, {'error': 'BLE printer module not available on this host'}, 500
 
-    cfg, pcfg = load_printer_config()
+    cfg, pcfg = load_printer_config(printer_name)
     if pcfg is None:
         return False, {'error': 'Printer config not found'}, 500
 
@@ -95,13 +101,17 @@ def print_png_via_ble(p: Path):
                                  dpi=dpi, invert=invert,
                                  prefer_resp=prefer_resp, throttle_ms=throttle_ms, chunk_size=chunk_size,
                                  **extra_kwargs)
-        # Choose printer name on Windows (use configured default_printer); Linux ignores this parameter
-        printer_name = None
+        # Choose printer name on Windows (use windows_printer_name from printer config); Linux ignores this parameter
+        printer_name_win = None
         if sys.platform.lower().startswith('win'):
             try:
-                printer_name = (cfg or {}).get('default_printer')
+                # Use windows_printer_name from the selected printer config
+                printer_name_win = pcfg.get('windows_printer_name')
+                if not printer_name_win:
+                    # Fallback to default_printer from global config
+                    printer_name_win = (cfg or {}).get('default_printer')
             except Exception:
-                printer_name = None
+                printer_name_win = None
         # Build args common to both platforms
         call_kwargs = dict(
             label_w_mm=w_in * 25.4,
@@ -114,7 +124,7 @@ def print_png_via_ble(p: Path):
         )
         # Only Windows backend supports these parameters
         if sys.platform.lower().startswith('win'):
-            call_kwargs['printer_name'] = printer_name
+            call_kwargs['printer_name'] = printer_name_win
             call_kwargs['printer_config'] = pcfg
 
         pble.print_pil_image(img, **call_kwargs)

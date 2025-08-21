@@ -204,6 +204,7 @@ def api_batch_parse():
 def api_reprint():
     data = request.get_json(silent=True) or {}
     rel = data.get('path')
+    printer_name = data.get('printer')
     if not rel:
         return jsonify({'error': 'Missing path'}), 400
     p = safe_path_from_query(rel)
@@ -236,7 +237,7 @@ def api_reprint():
             pass
 
     # Fallback: direct BLE image printing
-    ok, resp, code = print_png_via_ble(p)
+    ok, resp, code = print_png_via_ble(p, printer_name)
     return jsonify(resp), code
 
 
@@ -400,6 +401,7 @@ def post_pi_label_print():
         pass
 
     rel = data.get('path')
+    printer_name = data.get('printer')
     if isinstance(rel, str) and rel.strip():
         p = safe_path_from_query(unquote(rel.strip()))
         if not p:
@@ -407,10 +409,10 @@ def post_pi_label_print():
         current_app.logger.info("Queueing print PNG at: %s", p)
         jq = getattr(current_app, 'job_queue', None)
         if not jq:
-            ok, resp, code = print_png_via_ble(p)
+            ok, resp, code = print_png_via_ble(p, printer_name)
             return jsonify(resp), code
         # Enqueue direct image print
-        job = jq.enqueue('print', lambda: print_png_via_ble(p), payload={'path': rel})
+        job = jq.enqueue('print', lambda: print_png_via_ble(p, printer_name), payload={'path': rel, 'printer': printer_name})
         return jsonify({'queued': True, 'job_id': job.id, 'status': job.status}), 202
 
     ok, errors = validate_payload(data)
@@ -437,7 +439,7 @@ def post_pi_label_print():
                     save_request_data(reused_preview, data)
                 except Exception:
                     pass
-                ok, resp, code = print_png_via_ble(reused_preview)
+                ok, resp, code = print_png_via_ble(reused_preview, printer_name)
                 return jsonify({'reused': True, **resp}), code
         except Exception:
             pass
@@ -451,7 +453,7 @@ def post_pi_label_print():
                     save_request_data(reused_preview, data)
                 except Exception:
                     pass
-                return print_png_via_ble(reused_preview)
+                return print_png_via_ble(reused_preview, printer_name)
             env = os.environ.copy()
             env['LABEL_BORDER_ENABLED'] = '1' if data.get('border', True) else '0'
             result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
@@ -464,10 +466,10 @@ def post_pi_label_print():
                 save_request_data(preview_path, data)
             except Exception:
                 pass
-            return print_png_via_ble(preview_path)
+            return print_png_via_ble(preview_path, printer_name)
         except Exception as e:
             return False, {'error': str(e)}, 500
-    job = jq.enqueue('print', _job_fn, payload={'payload': data})
+    job = jq.enqueue('print', _job_fn, payload={'payload': data, 'printer': printer_name})
     return jsonify({'queued': True, 'job_id': job.id, 'status': job.status}), 202
 
 

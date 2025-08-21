@@ -102,8 +102,8 @@ def get_printer_config(config, printer_name):
         if "printers" not in config:
             config["printers"] = {}
         config["printers"][printer_name] = {
-            "label_width_in": 2.25,
-            "label_height_in": 1.25,
+            "label_width_in": 3,
+            "label_height_in": 1,
             "dpi": 203,
             "bottom_margin": 15,
             "horizontal_offset": 0,
