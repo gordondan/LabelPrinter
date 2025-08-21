@@ -97,7 +97,7 @@ class RW402BPrinter:
     """
     Linux/Pi BLE implementation. Usage:
         p = RW402BPrinter(addr="DD:0D:30:32:20:B0")
-        p.print_pil_image(image, label_w_mm=57, label_h_mm=31.75, gap_mm=3)
+        p.print_pil_image(image, label_w_mm=76.2, label_h_mm=25.4, gap_mm=3)  # 3" x 1" label
     """
 
     def __init__(self, addr: Optional[str] = None, timeout: float = 4.0,
