@@ -179,7 +179,9 @@
         if (raw.message.trim() !== '') printPayload.message = raw.message.trim();
         if (raw.border_message.trim() !== '') printPayload.border_message = raw.border_message.trim();
         if (raw.side_border.trim() !== '') printPayload.side_border = raw.side_border.trim();
-        if (raw.count.trim() !== '') printPayload.count = raw.count.trim();
+        // Always include count - even if it's "1" (default value)
+        const countValue = parseInt(raw.count.trim()) || 1;
+        printPayload.count = countValue;
     // Always send border and show_date explicitly
     const borderEl = document.getElementById('border');
     printPayload.border = !!(borderEl && borderEl.checked);
