@@ -18,7 +18,6 @@ Usage: $(basename "$0") [options]
 Options:
   -d, --dest DIR        Destination directory (default: /opt/LabelPrinter)
   -b, --backups DIR     Backups root directory (default: /opt/LabelPrinter-backups)
-  -m, --message MSG     Git commit message (default: "${COMMIT_MSG}")
   -n, --dry-run         Show actions without making changes
   -h, --help            Show this help
 
@@ -86,20 +85,7 @@ maybe_sudo() {
   fi
 }
 
-echo "[1/3] Committing repository changes..."
-# Stage everything and commit only if there are changes
-git add -A
-if git diff --cached --quiet && git diff --quiet; then
-  echo "No changes detected; skipping commit."
-else
-  if $DRY_RUN; then
-    echo "DRY-RUN: Would commit changes with message: $COMMIT_MSG ($(timestamp))"
-  else
-    git commit -m "$COMMIT_MSG ($(timestamp))"
-  fi
-fi
-
-echo "[2/3] Backing up existing deployment at $DEST_DIR..."
+echo "[1/2] Backing up existing deployment at $DEST_DIR..."
 TS="$(timestamp)"
 BACKUP_DIR="$BACKUP_ROOT/$TS"
 
@@ -118,7 +104,7 @@ else
   fi
 fi
 
-echo "[3/3] Syncing selected files to $DEST_DIR..."
+echo "[2/2] Syncing selected files to $DEST_DIR..."
 RSYNC_OPTS=(-av --delete --exclude "__pycache__/" --exclude ".venv/" --exclude ".git/" --exclude "logs/")
 if $DRY_RUN; then
   RSYNC_OPTS+=(--dry-run)
