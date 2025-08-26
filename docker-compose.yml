@@ -27,6 +27,21 @@ services:
     volumes:
       - ./duckdns/config:/config
     restart: unless-stopped
+    networks:
+      - web
+
+  label-printer:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: label-printer-app
+    ports:
+      - "8000:5000"
+    volumes:
+      - .:/app
+    restart: unless-stopped
+    networks:
+      - web
 
 networks:
   web:

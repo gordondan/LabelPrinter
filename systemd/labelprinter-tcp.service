@@ -5,17 +5,16 @@ After=network.target
 [Service]
 Type=simple
 # Paths for this repository
-WorkingDirectory=/home/relay-admin/repo/LabelPrinter
-Environment="PATH=/home/relay-admin/repo/LabelPrinter/.venv/bin"
+WorkingDirectory=/opt/LabelPrinter
+Environment="PATH=/opt/LabelPrinter/.venv/bin"
 Environment="PYTHONUNBUFFERED=1"
 EnvironmentFile=-/etc/default/labelprinter
 
 # Bind to TCP port 8000
-ExecStart=/home/relay-admin/repo/LabelPrinter/.venv/bin/gunicorn -w 2 -b 0.0.0.0:8000 server:app
+ExecStart=/opt/LabelPrinter/.venv/bin/gunicorn -w 2 -b 0.0.0.0:8000 server:app
 
 # Run as local user
-User=relay-admin
-Group=relay-admin
+
 SupplementaryGroups=lp,bluetooth
 
 Restart=on-failure
@@ -23,4 +22,3 @@ RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
-

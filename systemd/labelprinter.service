@@ -5,13 +5,13 @@ After=network.target
 [Service]
 Type=simple
 # Paths for this repository
-WorkingDirectory=/home/relay-admin/repo/LabelPrinter
-Environment="PATH=/home/relay-admin/repo/LabelPrinter/.venv/bin"
+WorkingDirectory=/opt/LabelPrinter
+Environment="PATH=/opt/LabelPrinter/.venv/bin"
 Environment="PYTHONUNBUFFERED=1"
 EnvironmentFile=-/etc/default/labelprinter
 
 # Bind to Unix socket for Nginx proxy
-ExecStart=/home/relay-admin/repo/LabelPrinter/.venv/bin/gunicorn -w 2 -b unix:/run/labelprinter/labelprinter.sock server:app
+ExecStart=/opt/LabelPrinter/.venv/bin/gunicorn -w 2 -b unix:/run/labelprinter/labelprinter.sock server:app
 
 # Run as local user; group www-data so Nginx can access the socket
 User=relay-admin
