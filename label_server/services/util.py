@@ -74,9 +74,11 @@ def parse_metrics_from_stdout(stdout: str):
 def list_recent_previews(limit: int = 100):
     base = past_images_dir()
     items: list[dict] = []
+    seen_keys = set()
     if not base.is_dir():
         return []
     try:
+        all_previews = []
         for p in base.rglob('label_preview.png'):
             try:
                 stat = p.stat()
@@ -85,14 +87,45 @@ def list_recent_previews(limit: int = 100):
             if 'deleted' in p.parts:
                 continue
             rel = p.resolve().relative_to(BASE_DIR)
-            items.append({
+            all_previews.append({
                 'path': str(rel).replace('\\', '/'),
                 'mtime_ts': int(stat.st_mtime),
                 'mtime_iso': datetime.fromtimestamp(stat.st_mtime).isoformat(timespec='seconds'),
                 'size': stat.st_size,
+                'file_path': p,
             })
-        items.sort(key=lambda x: x['mtime_ts'], reverse=True)
-        return items[:limit]
+
+        # Sort by modification time (newest first)
+        all_previews.sort(key=lambda x: x['mtime_ts'], reverse=True)
+
+        # Deduplicate based on request data
+        for item in all_previews:
+            # Try to load request data to get unique key
+            req_data, _ = load_request_data(item['file_path'])
+            if req_data:
+                # Create a unique key based on label content
+                unique_key = (
+                    req_data.get('message', ''),
+                    req_data.get('border_message', ''),
+                    req_data.get('side_border', ''),
+                    req_data.get('show_date', False),
+                    req_data.get('image', ''),
+                )
+            else:
+                # Fallback to using directory name as key (e.g., date folder)
+                parent_dir = item['file_path'].parent.name
+                unique_key = parent_dir
+
+            # Only add if we haven't seen this content before
+            if unique_key not in seen_keys:
+                seen_keys.add(unique_key)
+                # Remove the temporary file_path key before returning
+                del item['file_path']
+                items.append(item)
+                if len(items) >= limit:
+                    break
+
+        return items
     except Exception:
         return []
 

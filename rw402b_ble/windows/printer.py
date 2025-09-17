@@ -27,6 +27,7 @@ class RW402BPrinter:
             target_printer = printer_name or (self.config or {}).get('default_printer') or self._discover_label_printer_name()
             if not target_printer:
                 raise RuntimeError("No label printer found. Set 'default_printer' in config or install a Munbyn/Beeprt (RW402B) printer.")
+            print(f"Attempting to connect to printer: '{target_printer}'")
             hDC.CreatePrinterDC(target_printer)
 
             # windows_device_caps are stored in the global config

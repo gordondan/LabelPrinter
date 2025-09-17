@@ -907,12 +907,14 @@ if __name__ == "__main__":
     printer_profile_key = "RW402B"  # config key for dimensions/specs
     # On Windows, suggest the spooler printer name from config.default_printer (but do not use OS default implicitly)
     _sys = _platform.system().lower()
-    windows_printer_name = None
-    if _sys.startswith('win'):
-        windows_printer_name = config.get('default_printer') or None
-    
+
     # Get printer-specific configuration
     printer_config = get_printer_config(config, printer_profile_key)
+
+    # Get the actual Windows printer name from the printer config
+    windows_printer_name = None
+    if _sys.startswith('win'):
+        windows_printer_name = printer_config.get('windows_printer_name') or config.get('default_printer') or None
     
     # Step 2: Try to connect to Bluetooth printer (best effort)
     if printer_config['bluetooth_device_name']:

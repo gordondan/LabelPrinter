@@ -9,28 +9,94 @@
 </head>
 <body>
 
+  <style>
+    .controls-bar {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+    .control-btn {
+      padding: 8px 16px;
+      background: #4a9eff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+    .control-btn:hover {
+      background: #357fd8;
+    }
+    .control-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+  </style>
+
   <script src="/nav.js"></script>
   <script src="/link-grid.js"></script>
   <script>
+    let showDeleted = false;
+    let allItems = [];
+    let deletedItems = new Set();
+
     async function getRecentItems(){
       const res = await fetch('/api/recent');
       if (!res.ok) return [];
       const data = await res.json();
-      // Adapt to link-grid schema
-      return (data.items || []).map(it => ({ image_url: it.image_url, path: it.path }));
+      // Store all items
+      allItems = (data.items || []).map(it => ({ image_url: it.image_url, path: it.path }));
+
+      // Filter based on showDeleted flag
+      if (!showDeleted) {
+        return allItems.filter(it => !deletedItems.has(it.path));
+      }
+      return allItems;
     }
 
     async function doReprint(item){
       const selectedPrinter = document.getElementById('printer-select').value;
+
+      // Show printing status
+      const statusEl = document.querySelector('.lg-page > div[style*="position:fixed"]') ||
+                       document.querySelector('div[style*="position:fixed"][style*="bottom:12px"]');
+      if (statusEl) {
+        statusEl.textContent = 'Printing...';
+        statusEl.style.display = 'block';
+      }
+
       const res = await fetch('/api/reprint', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: item.path, printer: selectedPrinter })
       });
       try {
         const body = await res.json();
-        if (res.ok && body.ok) return;
+        if (res.ok && body.ok) {
+          // Show success message
+          if (statusEl) {
+            statusEl.textContent = 'Label sent to printer!';
+            statusEl.style.display = 'block';
+            setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
+          }
+          return;
+        }
         console.error('Reprint failed', body);
-      } catch {}
+        if (statusEl) {
+          statusEl.textContent = 'Print failed - check printer';
+          statusEl.style.display = 'block';
+          setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+        }
+      } catch {
+        if (statusEl) {
+          statusEl.textContent = 'Print error occurred';
+          statusEl.style.display = 'block';
+          setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+        }
+      }
     }
 
     async function doDelete(item){
@@ -40,12 +106,52 @@
       });
       try {
         const body = await res.json();
-        return !!(res.ok && body.ok);
+        if (res.ok && body.ok) {
+          deletedItems.add(item.path);
+          return true;
+        }
+        return false;
       } catch { return false; }
+    }
+
+    function hideAll() {
+      // Mark all current items as deleted (hidden)
+      allItems.forEach(item => deletedItems.add(item.path));
+      if (window.currentGrid) {
+        window.currentGrid.load();
+      }
+    }
+
+    function showAll() {
+      // Clear the deleted items set
+      deletedItems.clear();
+      showDeleted = false;
+      if (window.currentGrid) {
+        window.currentGrid.load();
+      }
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
       window.renderSiteHeader();
+
+      // Add control buttons
+      const controlsBar = document.createElement('div');
+      controlsBar.className = 'controls-bar';
+
+      const hideAllBtn = document.createElement('button');
+      hideAllBtn.className = 'control-btn';
+      hideAllBtn.textContent = 'Hide All';
+      hideAllBtn.onclick = hideAll;
+
+      const showAllBtn = document.createElement('button');
+      showAllBtn.className = 'control-btn';
+      showAllBtn.textContent = 'Show All';
+      showAllBtn.onclick = showAll;
+
+      controlsBar.appendChild(hideAllBtn);
+      controlsBar.appendChild(showAllBtn);
+      document.body.appendChild(controlsBar);
+
       const mount = document.body; // link-grid creates its own centered wrapper
       const grid = window.createLinkGrid({
         mount,
@@ -55,6 +161,7 @@
         onEnter: doReprint,
         onDelete: doDelete,
       });
+      window.currentGrid = grid; // Store grid reference for refresh
       await grid.load();
     });
   </script>
