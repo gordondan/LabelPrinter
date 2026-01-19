@@ -1,7 +1,13 @@
 (function(){
   function currentPath(){ return window.location.pathname || '/'; }
   function isActive(href){
-    try { return new URL(href, window.location.origin).pathname === currentPath(); }
+    try {
+      const targetPath = new URL(href, window.location.origin).pathname;
+      const current = currentPath();
+      // Handle root path matching for custom-label (now landing page)
+      if (href === '/' && (current === '/' || current === '/custom-label.html' || current === '/index.html')) return true;
+      return targetPath === current;
+    }
     catch { return false; }
   }
 
@@ -11,26 +17,52 @@
     header.innerHTML = `
       <div class="inner">
         <a class="site-brand" href="/">Label Printer <span id="jobsBadge" class="jobs-badge" style="display:none;"></span></a>
+        <button class="mobile-menu-toggle" aria-label="Toggle menu" aria-expanded="false">
+          <span class="hamburger"></span>
+        </button>
         <nav class="site-nav">
-          <a href="/" data-nav>Home <span class="nav-hotkey">(h)</span></a>
-          <a href="/custom-label.html" data-nav>Custom Label <span class="nav-hotkey">(c)</span></a>
+          <a href="/" data-nav>Create <span class="nav-hotkey">(c)</span></a>
           <a href="/recent.html" data-nav>Recent <span class="nav-hotkey">(r)</span></a>
           <a href="/batch" data-nav>Batch <span class="nav-hotkey">(b)</span></a>
         </nav>
+        <div class="printer-selector">
+          <label for="printer-select">Printer:</label>
+          <select id="printer-select"></select>
+        </div>
       </div>`;
 
-  document.body.prepend(header);
-  document.body.classList.add('has-site-header');
+    document.body.prepend(header);
+    document.body.classList.add('has-site-header');
+
+    // Mobile menu toggle
+    const menuToggle = header.querySelector('.mobile-menu-toggle');
+    const nav = header.querySelector('.site-nav');
+    const printerSelector = header.querySelector('.printer-selector');
+
+    menuToggle.addEventListener('click', () => {
+      const isExpanded = menuToggle.getAttribute('aria-expanded') === 'true';
+      menuToggle.setAttribute('aria-expanded', !isExpanded);
+      nav.classList.toggle('open');
+      printerSelector.classList.toggle('open');
+    });
+
+    // Close menu when clicking a nav link (mobile)
+    nav.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        nav.classList.remove('open');
+        printerSelector.classList.remove('open');
+        menuToggle.setAttribute('aria-expanded', 'false');
+      });
+    });
 
     // Set active link
     document.querySelectorAll('[data-nav]').forEach(a => {
       if (isActive(a.getAttribute('href'))) a.classList.add('active');
     });
 
-    // Global hotkeys for top nav
+    // Global hotkeys for top nav (c = create/home, r = recent, b = batch)
     const navMap = {
-      'h': '/',
-      'c': '/custom-label.html',
+      'c': '/',
       'r': '/recent.html',
       'b': '/batch',
     };
@@ -77,6 +109,39 @@
     refreshJobs();
     // Expose a manual bump so pages can trigger a one-shot refresh when they enqueue work
     window.bumpJobsBadge = () => { try { refreshJobs(); } catch{} };
+
+    // Load printer options
+    loadPrinters();
+  }
+
+  async function loadPrinters() {
+    const select = document.getElementById('printer-select');
+    if (!select) return;
+
+    try {
+      const res = await fetch('/api/pi-label/options');
+      const data = await res.json();
+      const printers = data.printers || [];
+
+      select.innerHTML = '';
+      if (printers.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No printers';
+        select.appendChild(opt);
+        return;
+      }
+
+      printers.forEach((p, i) => {
+        const opt = document.createElement('option');
+        opt.value = p.id || p.name || p;
+        opt.textContent = p.name || p.id || p;
+        if (i === 0) opt.selected = true;
+        select.appendChild(opt);
+      });
+    } catch {
+      select.innerHTML = '<option value="">Error loading</option>';
+    }
   }
 
   window.renderSiteHeader = renderHeader;

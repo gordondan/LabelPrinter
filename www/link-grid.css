@@ -1,151 +1,259 @@
-:root { --lg-bg:#e9f5e9; --lg-fg:#333; --lg-accent:#2E7D32; --lg-sel:#FFD700; }
+/* ============================================================ */
+/* ---         Modern Link Grid for Recent Labels             --- */
+/* ============================================================ */
+
+:root {
+    --lg-bg: #f8fafc;
+    --lg-fg: #1e293b;
+    --lg-accent: #059669;
+    --lg-accent-light: #10b981;
+    --lg-sel: #fbbf24;
+    --lg-surface: #ffffff;
+    --lg-border: #e2e8f0;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --lg-bg: #0f172a;
+        --lg-fg: #f1f5f9;
+        --lg-surface: #1e293b;
+        --lg-border: #334155;
+        --lg-sel: #f59e0b;
+    }
+}
 
 html, body {
-  background-color: var(--lg-bg);
-  color: var(--lg-fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--lg-bg);
+    color: var(--lg-fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    padding: 0;
 }
 
-/* Container that centers the grid vertically */
+/* Container that centers the grid */
 .lg-page {
-  /* Leave space for sticky header (if present) */
-  min-height: calc(100vh - var(--nav-height, 0px));
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding-top: 8px;
+    min-height: calc(100vh - var(--nav-height, 60px));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    padding-top: calc(var(--nav-height, 60px) + 1rem);
 }
 
-/* Grid of links */
+/* Grid of items */
 .lg-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 2rem;
-  padding: 2rem;
-  max-width: 1200px;
-  width: 100%;
-  box-sizing: border-box;
-  background: #fff;
-  border: 8px solid var(--lg-accent);
-  border-radius: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    padding: 1.5rem;
+    max-width: 800px;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--lg-surface);
+    border: 1px solid var(--lg-border);
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
 }
 
-/* Link tile styled like the kiosk buttons but with label aspect ratio */
+/* Individual tile */
 .lg-button {
-  aspect-ratio: 2.25 / 1.25; /* width / height to match label shape */
-  display: flex;
-  flex-direction: column; /* stack image and hotkey vertically */
-  justify-content: center;
-  align-items: center;
-  text-decoration: none;
-  background: var(--lg-accent);
-  border-radius: 15px;
-  box-shadow: 8px 8px 16px rgba(0,0,0,0.2), -8px -8px 16px rgba(255,255,255,0.7);
-  transition: transform .2s ease, box-shadow .2s ease, outline-offset .2s ease;
-  overflow: hidden;
-  position: relative;
-  gap: 0.4rem;
-  /* Make each tile 75% of the grid cell width */
-  width: 75%;
-  justify-self: center;
+    aspect-ratio: 2.25 / 1.25;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-decoration: none;
+    background: linear-gradient(135deg, var(--lg-accent) 0%, var(--lg-accent-light) 100%);
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    border: none;
+    padding: 0;
 }
 
 .lg-button img {
-  width: 50%;
-  height: auto;           /* keep aspect ratio */
-  max-height: 70%;        /* leave room for hotkey pill */
-  object-fit: contain;
-  display: block;
-  pointer-events: none;
+    width: 90%;
+    height: auto;
+    max-height: 85%;
+    object-fit: contain;
+    display: block;
+    pointer-events: none;
+    border-radius: 0.375rem;
 }
 
-/* Optional title under image */
 .lg-title {
-  color: #fff;
-  font-weight: 600;
-  font-size: 1rem;
-  text-align: center;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-align: center;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    padding: 0 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
 }
 
-/* Hotkey pill below the image */
 .lg-hotkey {
-  background: var(--lg-sel);
-  color: #1a1a1a;
-  border-radius: 10px;
-  padding: 2px 8px;
-  font-weight: 700;
-  font-size: 0.95rem;
-  line-height: 1.1;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.7), 0 2px 6px rgba(0,0,0,0.15);
-  user-select: none;
+    background: var(--lg-sel);
+    color: #1a1a1a;
+    border-radius: 999px;
+    padding: 0.125rem 0.5rem;
+    font-weight: 600;
+    font-size: 0.75rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    user-select: none;
 }
 
 .lg-button.selected {
-  outline: 9px solid var(--lg-sel);
-  outline-offset:12 px;
-  transform: scale(1.05);
-  box-shadow: 0 0 50px rgba(2, 61, 28, 0.7);
+    outline: 4px solid var(--lg-sel);
+    outline-offset: 2px;
+    transform: scale(1.03);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
 }
 
-.lg-button:focus { outline: none; }
-.lg-button:not(.selected):hover { transform: scale(1.02); }
+.lg-button:focus {
+    outline: none;
+}
 
-/* Click feedback */
-.lg-button:active { filter: brightness(0.9); }
+.lg-button:not(.selected):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 12px -2px rgba(0, 0, 0, 0.15);
+}
 
-/* Disabled state */
+.lg-button:active {
+    transform: scale(0.98);
+}
+
 .lg-button.is-disabled {
-  filter: grayscale(0.5) brightness(0.85);
-  cursor: not-allowed;
+    filter: grayscale(0.4) opacity(0.7);
+    cursor: not-allowed;
 }
 
-/* Busy overlay for printing */
+/* Busy overlay */
 .lg-button.is-busy::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: inherit;
 }
+
 .lg-button.is-busy::before {
-  content: "";
-  position: absolute;
-  top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  border: 3px solid rgba(255,255,255,0.6);
-  border-top-color: #fff;
-  animation: lg-spin .8s linear infinite;
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    animation: lg-spin 0.8s linear infinite;
+    z-index: 1;
 }
 
-@keyframes lg-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+@keyframes lg-spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
 
-/* Prev / Next controls with page indicator */
+/* Pagination controls */
 .lg-controls {
-  margin-top: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
+    margin-top: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 .lg-nav-btn {
-  background: var(--lg-accent);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  padding: .6rem 1.4rem;
-  font-size: 1.4rem;
-  font-weight: bold;
-  cursor: pointer;
-  box-shadow: 5px 5px 10px rgba(0,0,0,0.2);
-  transition: transform .1s ease, background-color .2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--lg-accent);
+    color: #fff;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.15s ease;
 }
-.lg-nav-btn:hover { background: #43A047; }
-.lg-nav-btn:active { transform: scale(0.95); }
-.lg-page-indicator { font-weight: 600; min-width: 7ch; text-align: center; }
 
-/* Responsive tweak: if viewport is narrow, allow 2 columns */
-@media (max-width: 900px) {
-  .lg-grid { grid-template-columns: repeat(2, 1fr); }
+.lg-nav-btn:hover {
+    background: var(--lg-accent-light);
+    transform: translateY(-1px);
+}
+
+.lg-nav-btn:active {
+    transform: scale(0.97);
+}
+
+.lg-nav-btn:disabled {
+    background: var(--lg-border);
+    color: #94a3b8;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.lg-page-indicator {
+    font-weight: 600;
+    min-width: 5ch;
+    text-align: center;
+    color: var(--lg-fg);
+}
+
+/* Status message at bottom */
+.lg-status {
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--lg-surface);
+    color: var(--lg-fg);
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--lg-border);
+    font-weight: 500;
+    z-index: 100;
+    transition: opacity 0.2s ease;
+}
+
+/* Responsive: more columns on larger screens */
+@media (min-width: 640px) {
+    .lg-page {
+        padding: 1.5rem;
+        padding-top: calc(var(--nav-height, 60px) + 1.5rem);
+    }
+
+    .lg-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.25rem;
+        padding: 2rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .lg-grid {
+        grid-template-columns: repeat(4, 1fr);
+        max-width: 1000px;
+    }
+}
+
+/* Touch optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .lg-button {
+        min-height: 80px;
+    }
+
+    .lg-nav-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
 }

@@ -18,12 +18,13 @@ pages_bp = Blueprint('pages', __name__)
 @pages_bp.route('/recent', methods=['GET'])
 @pages_bp.route('/batch', methods=['GET'])
 def serve_pages():
-    # Map all these routes to index.html or recent.html accordingly
+    # Map all these routes - custom-label.html is now the landing page
     if str(request.path).startswith('/recent'):
         return send_from_directory(os.path.join(BASE_DIR, 'www'), 'recent.html')
     if str(request.path).startswith('/batch'):
         return send_from_directory(os.path.join(BASE_DIR, 'www'), 'batch.html')
-    return send_from_directory(os.path.join(BASE_DIR, 'www'), 'index.html')
+    # Landing page is now the custom label creator
+    return send_from_directory(os.path.join(BASE_DIR, 'www'), 'custom-label.html')
 
 
 @pages_bp.route('/<path:filename>')

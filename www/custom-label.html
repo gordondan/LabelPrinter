@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Label</title>
-    <!-- Link to the external stylesheet -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Create Label</title>
     <link rel="stylesheet" href="/site.css">
     <link rel="stylesheet" href="/nav.css">
 </head>
@@ -16,100 +17,104 @@
     });
 </script>
 
-    <div class="container">
-        <form id="printForm">
-            <div class="form-grid">
-                <!-- Main Message -->
-                <div class="form-group full-width">
-                    <label for="message">Message
-                        <button type="button" id="msgDateBtn" class="icon-btn" title="Append a date" style="margin-left:6px;">�</button>
-                    </label>
-                    <input type="text" id="message" name="message" placeholder="e.g., It's leftovers enjoy it!">
-                    <input type="date" id="msgDatePicker" style="display:none;" aria-hidden="true">
+<div class="container">
+    <form id="printForm">
+        <div class="form-grid">
+            <!-- Main Message -->
+            <div class="form-group full-width">
+                <label for="message">
+                    Message
+                    <button type="button" id="msgDateBtn" class="icon-btn" title="Add a date">📅</button>
+                </label>
+                <input type="text" id="message" name="message" placeholder="What's on the label?">
+                <input type="date" id="msgDatePicker" style="display:none;" aria-hidden="true">
+            </div>
+
+            <!-- Quick toggles -->
+            <div class="form-group full-width checkbox-row">
+                <label>
+                    <input type="checkbox" id="show_date" name="show_date" checked>
+                    Today's Date
+                </label>
+                <label>
+                    <input type="checkbox" id="border" name="border" checked>
+                    Border
+                </label>
+            </div>
+
+            <!-- Preview area -->
+            <div class="form-group full-width">
+                <div id="previewContainer">
+                    <img id="previewImage" src="" alt="Label Preview">
                 </div>
+            </div>
 
-                <!-- Quick access print button near the top -->
-                <div class="form-group full-width" style="margin: 0.25rem 0 0.75rem;">
-                    <button type="submit" id="topSubmitButton" class="submit-btn" disabled>Print Label <span class="nav-hotkey">(p)</span></button>
-                </div>
+            <!-- Status message -->
+            <div id="statusMessage" class="full-width"></div>
 
-                <!-- Quick toggles visible on load -->
-                <div class="form-group full-width" style="display:flex; flex-direction:row; gap:1rem; align-items:center; flex-wrap:nowrap;">
-                    <label style="display:inline-flex; align-items:center; gap:0.5rem; white-space:nowrap; margin:0;">
-                        <input type="checkbox" id="show_date" name="show_date" checked>
-                        Include Today's Date
-                    </label>
-                    <label style="display:inline-flex; align-items:center; gap:0.5rem; white-space:nowrap; margin:0;">
-                        <input type="checkbox" id="border" name="border" checked>
-                        Border
-                    </label>
-                </div>
+            <!-- Print button -->
+            <div class="form-group full-width">
+                <button type="submit" id="submitButton" class="submit-btn" disabled>
+                    Print Label <span class="nav-hotkey">(p)</span>
+                </button>
+            </div>
 
-                <!-- Expandable Advanced Options -->
-                <div class="full-width">
-                  <details>
-                    <summary style="cursor:pointer;font-weight:700;">More options</summary>
-                    <div class="form-grid" style="margin-top:1rem;">
-                      <!-- Border Messages -->
-                                                                    <div class="form-group">
-                                                                            <label for="border_message">Top/Bottom Border Text
-                                                                                <button type="button" id="borderDateBtn" class="icon-btn" title="Append a date" style="margin-left:6px;">�</button>
-                                                                            </label>
-                                                                            <input type="text" id="border_message" name="border_message">
-                                                                            <input type="date" id="borderDatePicker" style="display:none;" aria-hidden="true">
-                                                                    </div>
-                                                                    <div class="form-group">
-                                                                            <label for="side_border">Side Border Text
-                                                                                <button type="button" id="sideDateBtn" class="icon-btn" title="Append a date" style="margin-left:6px;">�</button>
-                                                                            </label>
-                                                                            <input type="text" id="side_border" name="side_border">
-                                                                            <input type="date" id="sideDatePicker" style="display:none;" aria-hidden="true">
-                                                                    </div>
+            <!-- Expandable Advanced Options -->
+            <div class="full-width">
+                <details>
+                    <summary>More options</summary>
+                    <div class="form-grid">
+                        <!-- Border Messages -->
+                        <div class="form-group">
+                            <label for="border_message">
+                                Top/Bottom Text
+                                <button type="button" id="borderDateBtn" class="icon-btn" title="Add a date">📅</button>
+                            </label>
+                            <input type="text" id="border_message" name="border_message" placeholder="Repeating text">
+                            <input type="date" id="borderDatePicker" style="display:none;" aria-hidden="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="side_border">
+                                Side Text
+                                <button type="button" id="sideDateBtn" class="icon-btn" title="Add a date">📅</button>
+                            </label>
+                            <input type="text" id="side_border" name="side_border" placeholder="Repeating text">
+                            <input type="date" id="sideDatePicker" style="display:none;" aria-hidden="true">
+                        </div>
 
-                      <!-- Count -->
-                      <div class="form-group">
-                          <label for="count">Count</label>
-                          <input type="number" id="count" name="count" value="1" min="1">
-                      </div>
+                        <!-- Count -->
+                        <div class="form-group">
+                            <label for="count">Copies</label>
+                            <input type="number" id="count" name="count" value="1" min="1" max="99">
+                        </div>
 
-                      <!-- Image Upload (Optional) -->
-                      <div class="form-group full-width">
-                          <label>Image (optional)</label>
-                          <label for="imageUpload" class="file-input-wrapper" id="fileInputWrapper">
-                              <div>Click to select an image</div>
-                              <div id="fileName">No file chosen</div>
-                          </label>
-                          <input type="file" id="imageUpload" name="imageFile" accept="image/png, image/jpeg, image/gif" style="display:none;">
-                          <div id="uploadPreviewContainer" style="display: none;">
-                              <img id="uploadPreviewImage" src="#" alt="Your selected image">
-                              <button type="button" id="removeImageButton">Remove Image</button>
-                          </div>
-                      </div>
+                        <!-- Image Upload -->
+                        <div class="form-group full-width">
+                            <label>Image (optional)</label>
+                            <label for="imageUpload" class="file-input-wrapper" id="fileInputWrapper">
+                                <div>Tap to select an image</div>
+                                <div id="fileName">No file chosen</div>
+                            </label>
+                            <input type="file" id="imageUpload" name="imageFile" accept="image/png, image/jpeg, image/gif" style="display:none;">
+                            <div id="uploadPreviewContainer" style="display: none;">
+                                <img id="uploadPreviewImage" src="#" alt="Selected image">
+                                <button type="button" id="removeImageButton">Remove Image</button>
+                            </div>
+                        </div>
                     </div>
-                      <!-- Boolean Flags -->
-                      <!-- show_date moved above for quick access -->
-                      <!-- border moved above for quick access -->
-                  </details>
-                </div>
+                </details>
             </div>
-
-            <div id="statusMessage"></div>
-            <div id="previewContainer">
-                <img id="previewImage" src="" alt="Label Preview">
-            </div>
-
-            <button type="submit" id="submitButton" class="submit-btn" disabled>Print Label <span class="nav-hotkey">(p)</span></button>
-        </form>
-    </div>
+        </div>
+    </form>
+</div>
 
 <script>
     // --- FORM ELEMENTS ---
     const printForm = document.getElementById('printForm');
     const submitButton = document.getElementById('submitButton');
-    const topSubmitButton = document.getElementById('topSubmitButton');
     const statusMessage = document.getElementById('statusMessage');
     const previewImage = document.getElementById('previewImage');
-    
+
     // --- IMAGE UPLOAD ELEMENTS ---
     const imageUploadInput = document.getElementById('imageUpload');
     const fileNameDisplay = document.getElementById('fileName');
@@ -121,19 +126,18 @@
     // --- STATE ---
     let debounceTimer = null;
     let previewReady = false;
-    let lastPreviewPayload = null; // The payload used to create the preview
-    let lastPreviewPath = null; // Relative path to preview PNG for printing
+    let lastPreviewPayload = null;
+    let lastPreviewPath = null;
     let uploadedImagePath = null;
-    let uploadedImageSig = null; // Track file identity to avoid re-uploads (name+size+mtime)
+    let uploadedImageSig = null;
 
     function updatePrintButtonState() {
-    submitButton.disabled = !previewReady;
-    if (topSubmitButton) topSubmitButton.disabled = !previewReady;
+        submitButton.disabled = !previewReady;
     }
 
     function schedulePreviewDebounced() {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(generatePreview, 1500);
+        debounceTimer = setTimeout(generatePreview, 1200);
     }
 
     function fileSignature(file) {
@@ -156,9 +160,7 @@
     }
 
     function formatLongDate(dateStr) {
-        // dateStr is yyyy-mm-dd
         try {
-            // Avoid timezone shifts by forcing midnight
             const d = new Date(dateStr + 'T00:00:00');
             return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
         } catch { return dateStr; }
@@ -167,27 +169,22 @@
     function buildPayload({ previewOnly }) {
         const printPayload = {};
         const formData = new FormData(printForm);
-        // Base map of current field values (don't mutate DOM)
-    const raw = {
+        const raw = {
             message: (formData.get('message') || '').toString(),
             border_message: (formData.get('border_message') || '').toString(),
             side_border: (formData.get('side_border') || '').toString(),
             count: (formData.get('count') || '').toString(),
         };
 
-        // Copy populated values into payload
         if (raw.message.trim() !== '') printPayload.message = raw.message.trim();
         if (raw.border_message.trim() !== '') printPayload.border_message = raw.border_message.trim();
         if (raw.side_border.trim() !== '') printPayload.side_border = raw.side_border.trim();
-        // Always include count - even if it's "1" (default value)
         const countValue = parseInt(raw.count.trim()) || 1;
         printPayload.count = countValue;
-    // Always send border and show_date explicitly
-    const borderEl = document.getElementById('border');
-    printPayload.border = !!(borderEl && borderEl.checked);
-    const showDateEl = document.getElementById('show_date');
-    printPayload.show_date = !!(showDateEl && showDateEl.checked);
-        // preview-only flag removed; server infers preview by endpoint
+        const borderEl = document.getElementById('border');
+        printPayload.border = !!(borderEl && borderEl.checked);
+        const showDateEl = document.getElementById('show_date');
+        printPayload.show_date = !!(showDateEl && showDateEl.checked);
         if (uploadedImagePath) printPayload.image = uploadedImagePath;
         return printPayload;
     }
@@ -195,7 +192,6 @@
     async function pollForPreview(timeoutMs = 2000, intervalMs = 250) {
         const deadline = Date.now() + timeoutMs;
         while (Date.now() < deadline) {
-            // Try to load the preview image; if it loads, we’re done
             const testUrl = `/preview.png?ts=${Date.now()}`;
             try {
                 await new Promise((resolve, reject) => {
@@ -213,14 +209,12 @@
 
     async function generatePreview() {
         try {
-            // Show generating status and disable printing while we wait
             statusMessage.className = 'loading';
             statusMessage.textContent = 'Generating preview…';
             statusMessage.style.visibility = 'visible';
             previewReady = false;
             document.getElementById('previewContainer').classList.add('loading');
             updatePrintButtonState();
-            // Ensure image is uploaded if present
             await ensureImageUploaded();
             const payload = buildPayload({ previewOnly: true });
             const res = await fetch('/api/pi-label/preview', {
@@ -232,7 +226,6 @@
             let url = body.preview_url;
             lastPreviewPath = body.preview_path || null;
             if (!url) {
-                // Fallback: poll for preview.png briefly
                 url = await pollForPreview();
             }
             if (!url) throw new Error('No preview available.');
@@ -240,7 +233,6 @@
             previewImage.style.display = 'block';
             previewReady = true;
             lastPreviewPayload = payload;
-            // Hide the status message; preview image + enabled button are cues
             statusMessage.style.visibility = 'hidden';
             statusMessage.className = '';
             document.getElementById('previewContainer').classList.remove('loading');
@@ -261,39 +253,31 @@
     // --- EVENT LISTENER FOR FILE SELECTION ---
     imageUploadInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
-
         if (file && file.type.startsWith('image/')) {
             fileNameDisplay.textContent = file.name;
-
-            // Use FileReader to get the image data for preview
             const reader = new FileReader();
             reader.onload = (e) => {
                 uploadPreviewImage.src = e.target.result;
-                // Show the preview and hide the upload box
                 uploadPreviewContainer.style.display = 'block';
                 fileInputWrapper.style.display = 'none';
             };
             reader.readAsDataURL(file);
         }
-        // New image affects preview; schedule preview generation
         schedulePreviewDebounced();
     });
 
     // --- EVENT LISTENER FOR REMOVE BUTTON ---
     removeImageButton.addEventListener('click', () => {
-        // Clear the file input
-        imageUploadInput.value = ''; 
-        
-        // Hide the preview and show the upload box again
+        imageUploadInput.value = '';
         uploadPreviewContainer.style.display = 'none';
         fileInputWrapper.style.display = 'block';
-        
-        // Reset the file name text
         fileNameDisplay.textContent = 'No file chosen';
+        uploadedImagePath = null;
+        uploadedImageSig = null;
+        schedulePreviewDebounced();
     });
 
     // --- AUTOPREVIEW ON INPUT CHANGES ---
-    // Track text/number inputs for debounced preview; skip immediate toggles and date
     printForm.addEventListener('input', (e) => {
         const target = e.target;
         if (!target || !(target instanceof HTMLElement)) return;
@@ -308,26 +292,7 @@
     document.getElementById('border').addEventListener('change', generatePreview);
     document.getElementById('show_date').addEventListener('change', generatePreview);
 
-    function applyDateToFields(dateStr) {
-        const msgEl = document.getElementById('message');
-        const borderEl = document.getElementById('border_message');
-        const sideEl = document.getElementById('side_border');
-        if (!msgEl.value) {
-            msgEl.value = dateStr;
-            return true;
-        }
-        if (!borderEl.value) {
-            borderEl.value = dateStr;
-            return true;
-        }
-        if (!sideEl.value) {
-            sideEl.value = dateStr;
-            return true;
-        }
-        return false;
-    }
-
-    // Calendar buttons open pickers; selection appends a formatted date to the field
+    // Calendar buttons
     function attachCalendarPair(fieldId, btnId, pickerId) {
         const field = document.getElementById(fieldId);
         const btn = document.getElementById(btnId);
@@ -350,31 +315,29 @@
     // --- EVENT LISTENER FOR PRINT SUBMISSION ---
     printForm.addEventListener('submit', async (event) => {
         event.preventDefault();
-    if (!previewReady) { updateStatus('Generate a preview first.', 'error'); return; }
+        if (!previewReady) { updateStatus('Generate a preview first.', 'error'); return; }
 
         submitButton.disabled = true;
-        const originalText = submitButton.textContent;
-        submitButton.textContent = 'Printing…';
-        if (topSubmitButton) {
-            topSubmitButton.disabled = true;
-            var topOriginalText = topSubmitButton.textContent;
-            topSubmitButton.textContent = 'Printing…';
-        }
-    // Show spinner while printing and dim the preview
-    statusMessage.className = 'loading';
-    statusMessage.textContent = 'Printing…';
-    statusMessage.style.visibility = 'visible';
-    document.getElementById('previewContainer').classList.add('loading');
+        const originalText = submitButton.innerHTML;
+        submitButton.innerHTML = 'Printing…';
+        statusMessage.className = 'loading';
+        statusMessage.textContent = 'Sending to printer…';
+        statusMessage.style.visibility = 'visible';
+        document.getElementById('previewContainer').classList.add('loading');
 
         try {
-            // Prefer printing by preview path if available
             const printPayload = lastPreviewPath ? { path: lastPreviewPath } : { ...(lastPreviewPayload || buildPayload({ previewOnly: false })) };
             if (!lastPreviewPath) {
                 delete printPayload.preview_only;
                 if (uploadedImagePath) printPayload.image = uploadedImagePath;
             }
 
-            // Nudge the header badge to refresh now that we’re queuing a job
+            // Get selected printer
+            const printerSelect = document.getElementById('printer-select');
+            if (printerSelect && printerSelect.value) {
+                printPayload.printer = printerSelect.value;
+            }
+
             if (window.bumpJobsBadge) window.bumpJobsBadge();
             const printResponse = await fetch('/api/pi-label/print', {
                 method: 'POST',
@@ -386,8 +349,7 @@
                 const errorMsg = printResult.errors ? printResult.errors.join(', ') : printResult.error;
                 throw new Error(errorMsg || 'Print command failed.');
             }
-            updateStatus('Label sent to printer.', 'success');
-            // Optionally refresh preview if provided
+            updateStatus('Label sent to printer!', 'success');
             if (printResult.preview_url) {
                 previewImage.src = `${printResult.preview_url}&t=${Date.now()}`;
                 previewImage.style.display = 'block';
@@ -395,12 +357,10 @@
         } catch (error) {
             updateStatus(`Error: ${error.message}`, 'error');
         } finally {
-            submitButton.textContent = originalText;
+            submitButton.innerHTML = originalText;
             updatePrintButtonState();
-            // Clear spinner/dimming regardless of outcome
             statusMessage.className = '';
             document.getElementById('previewContainer').classList.remove('loading');
-            if (topSubmitButton) topSubmitButton.textContent = topOriginalText || 'Print Label (p)';
         }
     });
 
@@ -410,15 +370,10 @@
         statusMessage.style.visibility = message ? 'visible' : 'hidden';
     }
 
-    function resetButton() {
-        // Not used in new flow; keep for compatibility
-        updatePrintButtonState();
-    }
-
-    // Kick off an initial debounced preview on load (optional)
+    // Kick off an initial preview
     schedulePreviewDebounced();
 
-    // Global hotkey: 'p' to print (when preview is ready and not typing)
+    // Global hotkey: 'p' to print
     document.addEventListener('keydown', (ev) => {
         const t = ev.target;
         if (t && ((t.tagName === 'INPUT') || (t.tagName === 'TEXTAREA') || (t.isContentEditable))) return;
