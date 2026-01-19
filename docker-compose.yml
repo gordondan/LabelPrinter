@@ -1,48 +1,44 @@
 services:
-  nginx:
-    image: nginx:alpine
-    container_name: nginx-proxy
-    ports:
-      - "8080:80"
-      - "8443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/ssl:/etc/nginx/ssl
-      - ./www:/usr/share/nginx/html
-      - ./nginx/sites-enabled:/etc/nginx/sites-enabled
-    restart: unless-stopped
-    networks:
-      - web
-
-  duckdns:
-    image: lscr.io/linuxserver/duckdns:latest
-    container_name: duckdns
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=${TZ:-America/New_York}
-      - SUBDOMAINS=${DUCKDNS_SUBDOMAIN}
-      - TOKEN=${DUCKDNS_TOKEN}
-      - LOG_FILE=false
-    volumes:
-      - ./duckdns/config:/config
-    restart: unless-stopped
-    networks:
-      - web
-
   label-printer:
     build:
       context: .
       dockerfile: Dockerfile.app
     container_name: label-printer-app
     ports:
-      - "8000:5000"
+      - "5000:5000"
     volumes:
-      - .:/app
+      - ./config:/app/config
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./batches:/app/batches
+    environment:
+      - TZ=${TZ:-America/New_York}
     restart: unless-stopped
-    networks:
-      - web
+    # For Bluetooth access (needed for thermal printer)
+    privileged: true
 
-networks:
-  web:
-    driver: bridge
+  # Optional: Uncomment below for nginx reverse proxy and DuckDNS (external access)
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: nginx-proxy
+  #   ports:
+  #     - "8080:80"
+  #     - "8443:443"
+  #   volumes:
+  #     - ./nginx/conf.d:/etc/nginx/conf.d
+  #     - ./nginx/ssl:/etc/nginx/ssl
+  #     - ./www:/usr/share/nginx/html
+  #   restart: unless-stopped
+
+  # duckdns:
+  #   image: lscr.io/linuxserver/duckdns:latest
+  #   container_name: duckdns
+  #   environment:
+  #     - PUID=1000
+  #     - PGID=1000
+  #     - TZ=${TZ:-America/New_York}
+  #     - SUBDOMAINS=${DUCKDNS_SUBDOMAIN}
+  #     - TOKEN=${DUCKDNS_TOKEN}
+  #   volumes:
+  #     - ./duckdns/config:/config
+  #   restart: unless-stopped
