@@ -3,21 +3,21 @@
 /* ============================================================ */
 
 :root {
-    --lg-bg: #f8fafc;
-    --lg-fg: #1e293b;
-    --lg-accent: #059669;
-    --lg-accent-light: #10b981;
+    --lg-bg: #f0fdf4;
+    --lg-fg: #14532d;
+    --lg-accent: #16a34a;
+    --lg-accent-light: #22c55e;
     --lg-sel: #fbbf24;
     --lg-surface: #ffffff;
-    --lg-border: #e2e8f0;
+    --lg-border: #bbf7d0;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --lg-bg: #0f172a;
-        --lg-fg: #f1f5f9;
-        --lg-surface: #1e293b;
-        --lg-border: #334155;
+        --lg-bg: #052e16;
+        --lg-fg: #dcfce7;
+        --lg-surface: #14532d;
+        --lg-border: #166534;
         --lg-sel: #f59e0b;
     }
 }
