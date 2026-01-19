@@ -22,12 +22,8 @@
         <div class="form-grid">
             <!-- Main Message -->
             <div class="form-group full-width">
-                <label for="message">
-                    Message
-                    <button type="button" id="msgDateBtn" class="icon-btn" title="Add a date">📅</button>
-                </label>
+                <label for="message">Message</label>
                 <input type="text" id="message" name="message" placeholder="What's on the label?">
-                <input type="date" id="msgDatePicker" style="display:none;" aria-hidden="true">
             </div>
 
             <!-- Quick toggles -->
@@ -66,20 +62,12 @@
                     <div class="form-grid">
                         <!-- Border Messages -->
                         <div class="form-group">
-                            <label for="border_message">
-                                Top/Bottom Text
-                                <button type="button" id="borderDateBtn" class="icon-btn" title="Add a date">📅</button>
-                            </label>
+                            <label for="border_message">Top/Bottom Text</label>
                             <input type="text" id="border_message" name="border_message" placeholder="Repeating text">
-                            <input type="date" id="borderDatePicker" style="display:none;" aria-hidden="true">
                         </div>
                         <div class="form-group">
-                            <label for="side_border">
-                                Side Text
-                                <button type="button" id="sideDateBtn" class="icon-btn" title="Add a date">📅</button>
-                            </label>
+                            <label for="side_border">Side Text</label>
                             <input type="text" id="side_border" name="side_border" placeholder="Repeating text">
-                            <input type="date" id="sideDatePicker" style="display:none;" aria-hidden="true">
                         </div>
 
                         <!-- Count -->
@@ -157,13 +145,6 @@
         uploadedImagePath = uploadResult.filePath;
         uploadedImageSig = sig;
         return uploadedImagePath;
-    }
-
-    function formatLongDate(dateStr) {
-        try {
-            const d = new Date(dateStr + 'T00:00:00');
-            return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
-        } catch { return dateStr; }
     }
 
     function buildPayload({ previewOnly }) {
@@ -292,26 +273,6 @@
     document.getElementById('border').addEventListener('change', generatePreview);
     document.getElementById('show_date').addEventListener('change', generatePreview);
 
-    // Calendar buttons
-    function attachCalendarPair(fieldId, btnId, pickerId) {
-        const field = document.getElementById(fieldId);
-        const btn = document.getElementById(btnId);
-        const picker = document.getElementById(pickerId);
-        btn.addEventListener('click', () => picker.showPicker ? picker.showPicker() : picker.click());
-        picker.addEventListener('change', () => {
-            const v = (picker.value || '').trim();
-            if (!v) return;
-            const s = field.value || '';
-            const pretty = formatLongDate(v);
-            field.value = (s.length === 0 || /\s$/.test(s)) ? (s + pretty) : (s + ' ' + pretty);
-            picker.value = '';
-            generatePreview();
-        });
-    }
-    attachCalendarPair('message', 'msgDateBtn', 'msgDatePicker');
-    attachCalendarPair('border_message', 'borderDateBtn', 'borderDatePicker');
-    attachCalendarPair('side_border', 'sideDateBtn', 'sideDatePicker');
-
     // --- EVENT LISTENER FOR PRINT SUBMISSION ---
     printForm.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -332,10 +293,9 @@
                 if (uploadedImagePath) printPayload.image = uploadedImagePath;
             }
 
-            // Get selected printer
-            const printerSelect = document.getElementById('printer-select');
-            if (printerSelect && printerSelect.value) {
-                printPayload.printer = printerSelect.value;
+            // Get selected label size
+            if (window.getSelectedLabelSize) {
+                printPayload.label_size = window.getSelectedLabelSize();
             }
 
             if (window.bumpJobsBadge) window.bumpJobsBadge();

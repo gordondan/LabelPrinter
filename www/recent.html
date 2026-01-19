@@ -88,8 +88,7 @@
     }
 
     async function doReprint(item) {
-        const printerSelect = document.getElementById('printer-select');
-        const selectedPrinter = printerSelect ? printerSelect.value : '';
+        const labelSize = window.getSelectedLabelSize ? window.getSelectedLabelSize() : '1x3';
 
         const statusEl = document.querySelector('.lg-status');
         if (statusEl) {
@@ -101,7 +100,7 @@
             const res = await fetch('/api/reprint', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: item.path, printer: selectedPrinter })
+                body: JSON.stringify({ path: item.path, label_size: labelSize })
             });
             const body = await res.json();
             if (res.ok && body.ok) {

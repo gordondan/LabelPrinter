@@ -184,8 +184,8 @@
     font-weight: 500;
 }
 
-/* Printer selector */
-.printer-selector {
+/* Label size selector */
+.label-size-selector {
     display: none;
     align-items: center;
     gap: 0.5rem;
@@ -194,22 +194,22 @@
     border-top: 1px solid var(--nav-border);
 }
 
-.printer-selector.open {
+.label-size-selector.open {
     display: flex;
     position: absolute;
-    top: calc(var(--nav-height) + 160px);
+    top: calc(var(--nav-height) + 120px);
     left: 0;
     right: 0;
 }
 
-.printer-selector label {
+.label-size-selector label {
     font-weight: 600;
     font-size: 0.8125rem;
     color: var(--nav-fg);
     white-space: nowrap;
 }
 
-.printer-selector select {
+.label-size-selector select {
     flex: 1;
     min-width: 0;
     padding: 0.5rem 2rem 0.5rem 0.75rem;
@@ -228,10 +228,15 @@
     background-position: right 0.5rem center;
 }
 
-.printer-selector select:hover,
-.printer-selector select:focus {
+.label-size-selector select:hover,
+.label-size-selector select:focus {
     border-color: var(--nav-accent);
     outline: none;
+}
+
+/* Hide Batch tab on mobile */
+.site-nav a.desktop-only {
+    display: none;
 }
 
 .site-header, .site-header * {
@@ -268,7 +273,11 @@ body.has-site-header {
         font-size: 0.875rem;
     }
 
-    .printer-selector {
+    .site-nav a.desktop-only {
+        display: flex;
+    }
+
+    .label-size-selector {
         display: flex;
         position: static;
         background: transparent;
@@ -277,7 +286,7 @@ body.has-site-header {
         margin-left: auto;
     }
 
-    .printer-selector select {
+    .label-size-selector select {
         max-width: 140px;
     }
 }
@@ -291,7 +300,7 @@ body.has-site-header {
         padding: 0.5rem 1rem;
     }
 
-    .printer-selector select {
+    .label-size-selector select {
         max-width: 180px;
     }
 }

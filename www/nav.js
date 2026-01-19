@@ -23,11 +23,15 @@
         <nav class="site-nav">
           <a href="/" data-nav>Create <span class="nav-hotkey">(c)</span></a>
           <a href="/recent.html" data-nav>Recent <span class="nav-hotkey">(r)</span></a>
-          <a href="/batch" data-nav>Batch <span class="nav-hotkey">(b)</span></a>
+          <a href="/batch" data-nav class="desktop-only">Batch <span class="nav-hotkey">(b)</span></a>
         </nav>
-        <div class="printer-selector">
-          <label for="printer-select">Printer:</label>
-          <select id="printer-select"></select>
+        <div class="label-size-selector">
+          <label for="label-size-select">Size:</label>
+          <select id="label-size-select">
+            <option value="1x3" selected>1" × 3"</option>
+            <option value="2.25x1.25">2.25" × 1.25"</option>
+            <option value="4x6">4" × 6"</option>
+          </select>
         </div>
       </div>`;
 
@@ -37,20 +41,20 @@
     // Mobile menu toggle
     const menuToggle = header.querySelector('.mobile-menu-toggle');
     const nav = header.querySelector('.site-nav');
-    const printerSelector = header.querySelector('.printer-selector');
+    const labelSizeSelector = header.querySelector('.label-size-selector');
 
     menuToggle.addEventListener('click', () => {
       const isExpanded = menuToggle.getAttribute('aria-expanded') === 'true';
       menuToggle.setAttribute('aria-expanded', !isExpanded);
       nav.classList.toggle('open');
-      printerSelector.classList.toggle('open');
+      labelSizeSelector.classList.toggle('open');
     });
 
     // Close menu when clicking a nav link (mobile)
     nav.querySelectorAll('a').forEach(a => {
       a.addEventListener('click', () => {
         nav.classList.remove('open');
-        printerSelector.classList.remove('open');
+        labelSizeSelector.classList.remove('open');
         menuToggle.setAttribute('aria-expanded', 'false');
       });
     });
@@ -110,38 +114,11 @@
     // Expose a manual bump so pages can trigger a one-shot refresh when they enqueue work
     window.bumpJobsBadge = () => { try { refreshJobs(); } catch{} };
 
-    // Load printer options
-    loadPrinters();
-  }
-
-  async function loadPrinters() {
-    const select = document.getElementById('printer-select');
-    if (!select) return;
-
-    try {
-      const res = await fetch('/api/pi-label/options');
-      const data = await res.json();
-      const printers = data.printers || [];
-
-      select.innerHTML = '';
-      if (printers.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = 'No printers';
-        select.appendChild(opt);
-        return;
-      }
-
-      printers.forEach((p, i) => {
-        const opt = document.createElement('option');
-        opt.value = p.id || p.name || p;
-        opt.textContent = p.name || p.id || p;
-        if (i === 0) opt.selected = true;
-        select.appendChild(opt);
-      });
-    } catch {
-      select.innerHTML = '<option value="">Error loading</option>';
-    }
+    // Expose function to get selected label size
+    window.getSelectedLabelSize = () => {
+      const select = document.getElementById('label-size-select');
+      return select ? select.value : '1x3';
+    };
   }
 
   window.renderSiteHeader = renderHeader;
