@@ -14,11 +14,17 @@
     <key>WorkingDirectory</key>
     <string>/Users/gordon/source/repos/LabelPrinter</string>
 
+    <!-- Run at system boot (before login) -->
     <key>RunAtLoad</key>
     <true/>
 
+    <!-- Restart if it crashes -->
     <key>KeepAlive</key>
     <true/>
+
+    <!-- Run as root for USB access -->
+    <key>UserName</key>
+    <string>root</string>
 
     <key>StandardOutPath</key>
     <string>/Users/gordon/source/repos/LabelPrinter/logs/print-agent.log</string>
