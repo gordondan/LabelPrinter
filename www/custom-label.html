@@ -348,6 +348,25 @@
     // Kick off an initial preview
     schedulePreviewDebounced();
 
+    // Update preview aspect ratio based on label size
+    function updatePreviewAspectRatio() {
+        const dims = window.getSelectedLabelDimensions ? window.getSelectedLabelDimensions() : { width: 3, height: 1 };
+        const container = document.getElementById('previewContainer');
+        if (container) {
+            // Set aspect ratio CSS (width / height)
+            container.style.aspectRatio = `${dims.width} / ${dims.height}`;
+        }
+    }
+
+    // Listen for label size changes
+    window.addEventListener('labelsizechange', () => {
+        updatePreviewAspectRatio();
+        schedulePreviewDebounced(); // Regenerate preview with new size
+    });
+
+    // Set initial aspect ratio after header renders
+    setTimeout(updatePreviewAspectRatio, 100);
+
     // Global hotkey: 'p' to print
     document.addEventListener('keydown', (ev) => {
         const t = ev.target;

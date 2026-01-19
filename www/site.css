@@ -403,7 +403,7 @@ details > .form-grid {
     to { transform: rotate(360deg); }
 }
 
-/* Preview container - compact */
+/* Preview container - dynamic aspect ratio */
 #previewContainer {
     margin-top: var(--space-sm);
     text-align: center;
@@ -414,7 +414,9 @@ details > .form-grid {
     background: var(--color-border-light);
     border-radius: var(--radius-lg);
     border: 2px solid var(--color-border);
-    min-height: 80px;
+    min-height: 60px;
+    aspect-ratio: 3 / 1; /* Default: 3" × 1" label */
+    max-height: 300px;
 }
 
 #previewImage {

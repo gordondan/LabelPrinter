@@ -915,10 +915,11 @@ if __name__ == "__main__":
     printer_config = get_printer_config(config, printer_profile_key)
 
     # Override dimensions based on label size argument
+    # Format: 'id': {'label_width_in': W, 'label_height_in': H}
     LABEL_SIZES = {
-        '1x3': {'label_height_in': 1.0, 'label_width_in': 3.0},
-        '2.25x1.25': {'label_height_in': 1.25, 'label_width_in': 2.25},
-        '4x6': {'label_height_in': 4.0, 'label_width_in': 6.0},
+        '1x3': {'label_width_in': 3.0, 'label_height_in': 1.0},       # 3" wide × 1" tall
+        '2.25x1.25': {'label_width_in': 2.25, 'label_height_in': 1.25},  # 2.25" wide × 1.25" tall
+        '4x6': {'label_width_in': 4.0, 'label_height_in': 6.0},       # 4" wide × 6" tall (shipping)
     }
     if args.label_size in LABEL_SIZES:
         size_override = LABEL_SIZES[args.label_size]

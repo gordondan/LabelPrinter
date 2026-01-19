@@ -28,9 +28,9 @@
         <div class="label-size-selector">
           <label for="label-size-select">Size:</label>
           <select id="label-size-select">
-            <option value="1x3" selected>1" × 3"</option>
-            <option value="2.25x1.25">2.25" × 1.25"</option>
-            <option value="4x6">4" × 6"</option>
+            <option value="1x3" data-width="3" data-height="1" selected>3" × 1"</option>
+            <option value="2.25x1.25" data-width="2.25" data-height="1.25">2.25" × 1.25"</option>
+            <option value="4x6" data-width="4" data-height="6">4" × 6"</option>
           </select>
         </div>
       </div>`;
@@ -119,6 +119,27 @@
       const select = document.getElementById('label-size-select');
       return select ? select.value : '1x3';
     };
+
+    // Expose function to get label dimensions (width, height in inches)
+    window.getSelectedLabelDimensions = () => {
+      const select = document.getElementById('label-size-select');
+      if (!select) return { width: 3, height: 1 };
+      const option = select.options[select.selectedIndex];
+      return {
+        width: parseFloat(option.dataset.width) || 3,
+        height: parseFloat(option.dataset.height) || 1
+      };
+    };
+
+    // Dispatch event when label size changes
+    const labelSelect = document.getElementById('label-size-select');
+    if (labelSelect) {
+      labelSelect.addEventListener('change', () => {
+        window.dispatchEvent(new CustomEvent('labelsizechange', {
+          detail: window.getSelectedLabelDimensions()
+        }));
+      });
+    }
   }
 
   window.renderSiteHeader = renderHeader;
