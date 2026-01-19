@@ -1,4 +1,4 @@
-:root { --nav-height: 64px; --nav-bg: #ffffffcc; --nav-fg:#222; --nav-accent:#4169E1; }
+:root { --nav-height: 64px; --nav-bg: #ffffffcc; --nav-fg:#222; --nav-accent:#2E7D32; }
 
 .site-header {
   position: fixed;
@@ -60,12 +60,12 @@ body.has-site-header { padding-top: var(--nav-height); }
 }
 
 .site-nav a:hover {
-  background: rgba(65,105,225,0.08);
+  background: rgba(46,125,50,0.08);
 }
 
 .site-nav a.active {
   color: var(--nav-accent);
-  background: rgba(65,105,225,0.12);
+  background: rgba(46,125,50,0.12);
 }
 
 .nav-hotkey {
@@ -105,5 +105,5 @@ body.has-site-header { padding-top: var(--nav-height); }
 .printer-selector select:focus {
   outline: none;
   border-color: var(--nav-accent);
-  box-shadow: 0 0 0 3px rgba(65,105,225,0.1);
+  box-shadow: 0 0 0 3px rgba(46,125,50,0.1);
 }
