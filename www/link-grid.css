@@ -3,22 +3,24 @@
 /* ============================================================ */
 
 :root {
-    --lg-bg: #f0fdf4;
-    --lg-fg: #14532d;
-    --lg-accent: #16a34a;
-    --lg-accent-light: #22c55e;
+    --lg-bg: #f1f5f9;
+    --lg-fg: #0f172a;
+    --lg-accent: #1e3a5f;
+    --lg-accent-light: #2d4a6f;
     --lg-sel: #fbbf24;
     --lg-surface: #ffffff;
-    --lg-border: #bbf7d0;
+    --lg-border: #cbd5e1;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --lg-bg: #052e16;
-        --lg-fg: #dcfce7;
-        --lg-surface: #14532d;
-        --lg-border: #166534;
+        --lg-bg: #0f172a;
+        --lg-fg: #e2e8f0;
+        --lg-surface: #1e293b;
+        --lg-border: #334155;
         --lg-sel: #f59e0b;
+        --lg-accent: #60a5fa;
+        --lg-accent-light: #93c5fd;
     }
 }
 
