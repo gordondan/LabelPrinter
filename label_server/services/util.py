@@ -98,10 +98,26 @@ def list_recent_previews(limit: int = 100):
         # Sort by modification time (newest first)
         all_previews.sort(key=lambda x: x['mtime_ts'], reverse=True)
 
-        # Deduplicate based on request data
+        # Deduplicate based on request data and only show printed labels
         for item in all_previews:
-            # Try to load request data to get unique key
-            req_data, _ = load_request_data(item['file_path'])
+            # Try to load request data to get unique key and printed status
+            file_path = item['file_path']
+            req_data = None
+            printed = False
+            try:
+                import json
+                request_path = file_path.with_name('request.json')
+                if request_path.is_file():
+                    data = json.loads(request_path.read_text(encoding='utf-8'))
+                    req_data = data.get('original_request')
+                    printed = data.get('printed', False)
+            except Exception:
+                pass
+
+            # Skip labels that were never printed (only previewed)
+            if not printed:
+                continue
+
             if req_data:
                 # Create a unique key based on label content
                 unique_key = (
@@ -113,7 +129,7 @@ def list_recent_previews(limit: int = 100):
                 )
             else:
                 # Fallback to using directory name as key (e.g., date folder)
-                parent_dir = item['file_path'].parent.name
+                parent_dir = file_path.parent.name
                 unique_key = parent_dir
 
             # Only add if we haven't seen this content before
@@ -152,13 +168,27 @@ def safe_path_from_query(rel_path: str) -> Path | None:
         return None
 
 
-def save_request_data(preview_path: Path, request_data: dict):
+def save_request_data(preview_path: Path, request_data: dict, printed: bool = False):
     try:
         import json
         request_path = preview_path.with_name('request.json')
         normalized_request = normalize_request_for_template_matching(request_data)
+        # Load existing data to preserve printed flag if already set
+        existing_data = {}
+        if request_path.is_file():
+            try:
+                existing_data = json.loads(request_path.read_text(encoding='utf-8'))
+            except Exception:
+                pass
+        # Preserve printed=True if already set (once printed, always printed)
+        was_printed = existing_data.get('printed', False)
         with open(request_path, 'w', encoding='utf-8') as f:
-            json.dump({'original_request': request_data, 'normalized_template': normalized_request, 'timestamp': datetime.now().isoformat()}, f, indent=2)
+            json.dump({
+                'original_request': request_data,
+                'normalized_template': normalized_request,
+                'timestamp': datetime.now().isoformat(),
+                'printed': printed or was_printed,
+            }, f, indent=2)
     except Exception:
         pass
 

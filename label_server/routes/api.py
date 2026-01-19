@@ -230,13 +230,17 @@ def api_reprint():
             result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
             elapsed_sec = time.perf_counter() - t0
             if result.returncode == 0:
+                # Mark as printed
+                save_request_data(p, original_request, printed=True)
                 return jsonify({'ok': True, 'elapsed_sec': round(elapsed_sec, 3), 'method': 'template_regeneration', 'stdout': (result.stdout or '').strip()})
             else:
                 return jsonify({'error': f'Template regeneration failed: {result.stderr}', 'fallback_reason': 'Falling back to direct image printing'}), 400
         except Exception:
             pass
 
-    # Fallback: direct BLE image printing
+    # Fallback: direct BLE image printing - also mark as printed
+    if original_request:
+        save_request_data(p, original_request, printed=True)
     ok, resp, code = print_png_via_ble(p, printer_name)
     return jsonify(resp), code
 
@@ -271,6 +275,12 @@ def build_command_from_payload(payload: dict):
         val = payload.get(key)
         if isinstance(val, str) and val.strip():
             cmd.extend([flag, val.strip()])
+
+    # Handle label size
+    label_size = payload.get('label_size')
+    if isinstance(label_size, str) and label_size.strip():
+        cmd.extend(['-z', label_size.strip()])
+
     return cmd
 
 
@@ -407,6 +417,13 @@ def post_pi_label_print():
         if not p:
             return jsonify({'error': 'Invalid path'}), 400
         current_app.logger.info("Queueing print PNG at: %s", p)
+
+        # Mark as printed in request.json
+        from ..services.util import load_request_data
+        original_request, _ = load_request_data(p)
+        if original_request:
+            save_request_data(p, original_request, printed=True)
+
         jq = getattr(current_app, 'job_queue', None)
         if not jq:
             ok, resp, code = print_png_via_ble(p, printer_name)
@@ -450,7 +467,7 @@ def post_pi_label_print():
             reused_preview = find_existing_template_match(data)
             if reused_preview:
                 try:
-                    save_request_data(reused_preview, data)
+                    save_request_data(reused_preview, data, printed=True)
                 except Exception:
                     pass
                 return print_png_via_ble(reused_preview, printer_name)
@@ -463,7 +480,7 @@ def post_pi_label_print():
             if not preview_path:
                 raise RuntimeError('No preview generated')
             try:
-                save_request_data(preview_path, data)
+                save_request_data(preview_path, data, printed=True)
             except Exception:
                 pass
             return print_png_via_ble(preview_path, printer_name)

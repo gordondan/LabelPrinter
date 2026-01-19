@@ -118,14 +118,19 @@
     let lastPreviewPath = null;
     let uploadedImagePath = null;
     let uploadedImageSig = null;
+    let printCooldownActive = false;
 
     function updatePrintButtonState() {
-        submitButton.disabled = !previewReady;
+        // Disable if: preview not ready, OR print cooldown active
+        submitButton.disabled = !previewReady || printCooldownActive;
     }
 
     function schedulePreviewDebounced() {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(generatePreview, 1200);
+        // Disable button immediately when form changes
+        previewReady = false;
+        updatePrintButtonState();
+        debounceTimer = setTimeout(generatePreview, 500);
     }
 
     function fileSignature(file) {
@@ -314,12 +319,22 @@
                 previewImage.src = `${printResult.preview_url}&t=${Date.now()}`;
                 previewImage.style.display = 'block';
             }
+            // Keep button disabled for 3 seconds after success to indicate completion
+            printCooldownActive = true;
+            submitButton.innerHTML = 'Sent!';
+            submitButton.disabled = true;
+            document.getElementById('previewContainer').classList.remove('loading');
+            setTimeout(() => {
+                printCooldownActive = false;
+                submitButton.innerHTML = originalText;
+                updatePrintButtonState();
+            }, 3000);
+            return; // Skip finally block's button reset
         } catch (error) {
             updateStatus(`Error: ${error.message}`, 'error');
-        } finally {
             submitButton.innerHTML = originalText;
             updatePrintButtonState();
-            statusMessage.className = '';
+        } finally {
             document.getElementById('previewContainer').classList.remove('loading');
         }
     });

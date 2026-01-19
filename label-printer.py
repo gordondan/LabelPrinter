@@ -892,6 +892,9 @@ if __name__ == "__main__":
                         help='Show dates on the label (dates are hidden by default)')
     parser.add_argument('-p', '--preview-only', action='store_true',
                         help='Generate label image only (do not print to printer)')
+    parser.add_argument('-z', '--label-size', type=str, default='1x3',
+                        choices=['1x3', '2.25x1.25', '4x6'],
+                        help='Label size: 1x3 (1"x3"), 2.25x1.25 (2.25"x1.25"), or 4x6 (4"x6"). Default: 1x3')
     args = parser.parse_args()
     
     # Log the command execution
@@ -910,6 +913,19 @@ if __name__ == "__main__":
 
     # Get printer-specific configuration
     printer_config = get_printer_config(config, printer_profile_key)
+
+    # Override dimensions based on label size argument
+    LABEL_SIZES = {
+        '1x3': {'label_height_in': 1.0, 'label_width_in': 3.0},
+        '2.25x1.25': {'label_height_in': 1.25, 'label_width_in': 2.25},
+        '4x6': {'label_height_in': 4.0, 'label_width_in': 6.0},
+    }
+    if args.label_size in LABEL_SIZES:
+        size_override = LABEL_SIZES[args.label_size]
+        printer_config = dict(printer_config)  # copy to avoid modifying original
+        printer_config['label_height_in'] = size_override['label_height_in']
+        printer_config['label_width_in'] = size_override['label_width_in']
+        logger.log(f"Using label size: {args.label_size} ({size_override['label_height_in']}\" x {size_override['label_width_in']}\")")
 
     # Get the actual Windows printer name from the printer config
     windows_printer_name = None
