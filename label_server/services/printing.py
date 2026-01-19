@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import io
+import os
 from pathlib import Path
 from PIL import Image
 import sys
@@ -12,6 +15,10 @@ except Exception:  # noqa: E722
     RW402BPrinter = None
 
 from .util import BASE_DIR
+
+# If PRINT_AGENT_URL is set, use the print agent instead of direct BLE
+# This allows Docker containers to print via a native Mac/Linux agent
+PRINT_AGENT_URL = os.environ.get('PRINT_AGENT_URL', '').strip()
 
 
 def get_config_file_for_os() -> Path:
@@ -58,7 +65,56 @@ def load_printer_config(printer_name: str = None):
         return None, None
 
 
+def print_via_agent(p: Path, printer_name: str = None, copies: int = 1):
+    """Send print job to the print agent service."""
+    import urllib.request
+    import json as _json
+
+    try:
+        img = Image.open(p)
+        # Convert to PNG bytes
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        image_base64 = base64.b64encode(buf.getvalue()).decode('ascii')
+    except Exception as e:
+        return False, {'error': f'Failed to load image: {e}'}, 500
+
+    payload = {
+        'image_base64': image_base64,
+        'copies': copies,
+    }
+    if printer_name:
+        payload['printer_name'] = printer_name
+
+    try:
+        t0 = time.perf_counter()
+        req = urllib.request.Request(
+            f"{PRINT_AGENT_URL}/print",
+            data=_json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = _json.loads(resp.read().decode('utf-8'))
+
+        elapsed_sec = time.perf_counter() - t0
+
+        if result.get('ok'):
+            return True, {'ok': True, 'elapsed_sec': round(elapsed_sec, 3), 'method': 'print_agent'}, 200
+        else:
+            return False, {'error': result.get('error', 'Unknown error from print agent')}, 500
+
+    except urllib.error.URLError as e:
+        return False, {'error': f'Failed to connect to print agent: {e}'}, 500
+    except Exception as e:
+        return False, {'error': f'Print agent error: {e}'}, 500
+
+
 def print_png_via_ble(p: Path, printer_name: str = None):
+    # If print agent URL is configured, use it instead of direct BLE
+    if PRINT_AGENT_URL:
+        return print_via_agent(p, printer_name)
+
     if RW402BPrinter is None:
         return False, {'error': 'BLE printer module not available on this host'}, 500
 

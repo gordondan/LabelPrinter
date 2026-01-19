@@ -13,9 +13,9 @@ services:
       - ./batches:/app/batches
     environment:
       - TZ=${TZ:-America/New_York}
+      # Print agent URL - connects to native Mac service for Bluetooth printing
+      - PRINT_AGENT_URL=http://host.docker.internal:5001
     restart: unless-stopped
-    # For Bluetooth access (needed for thermal printer)
-    privileged: true
 
   # Optional: Uncomment below for nginx reverse proxy and DuckDNS (external access)
   # nginx:

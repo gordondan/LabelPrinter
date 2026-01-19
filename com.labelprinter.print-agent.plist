@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.labelprinter.print-agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/gordon/Documents/GitHub/LabelPrinter/.venv/bin/python</string>
+        <string>/Users/gordon/Documents/GitHub/LabelPrinter/print_agent.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/gordon/Documents/GitHub/LabelPrinter</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/gordon/Documents/GitHub/LabelPrinter/logs/print-agent.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/gordon/Documents/GitHub/LabelPrinter/logs/print-agent-error.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>
