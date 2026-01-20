@@ -25,12 +25,15 @@ done
 
 DAEMON_PLIST="com.labelprinter.print-agent-daemon.plist"
 AGENT_PLIST="com.labelprinter.web-app.plist"
+WATCHDOG_PLIST="com.labelprinter.watchdog.plist"
 
 DAEMON_SRC="$PROJECT_DIR/$DAEMON_PLIST"
 AGENT_SRC="$PROJECT_DIR/$AGENT_PLIST"
+WATCHDOG_SRC="$PROJECT_DIR/$WATCHDOG_PLIST"
 
 DAEMON_DST="/Library/LaunchDaemons/com.labelprinter.print-agent.plist"
 AGENT_DST="$HOME/Library/LaunchAgents/$AGENT_PLIST"
+WATCHDOG_DST="$HOME/Library/LaunchAgents/$WATCHDOG_PLIST"
 
 echo "========================================"
 echo "LabelPrinter macOS Services Installer"
@@ -129,7 +132,25 @@ sudo -u "$ACTUAL_USER" docker compose -f "$PROJECT_DIR/docker-compose.yml" up -d
 echo "      ✓ Docker container started"
 echo ""
 
-echo "[3/4] Verifying services..."
+echo "[3/5] Installing Watchdog service..."
+echo "      This checks every 5 minutes and restarts if needed"
+
+# Make watchdog script executable
+chmod +x "$PROJECT_DIR/scripts/watchdog.sh"
+
+# Stop existing watchdog if running
+sudo -u "$ACTUAL_USER" launchctl bootout "gui/$(id -u $ACTUAL_USER)/com.labelprinter.watchdog" 2>/dev/null || true
+
+# Copy and load watchdog agent
+cp "$WATCHDOG_SRC" "$WATCHDOG_DST"
+chmod 644 "$WATCHDOG_DST"
+chown "$ACTUAL_USER" "$WATCHDOG_DST"
+sudo -u "$ACTUAL_USER" launchctl bootstrap "gui/$(id -u $ACTUAL_USER)" "$WATCHDOG_DST"
+
+echo "      ✓ Watchdog service installed"
+echo ""
+
+echo "[4/5] Verifying services..."
 echo ""
 
 # Check print agent
@@ -146,8 +167,15 @@ else
     echo "      ⚠ Web App agent may need re-login to start"
 fi
 
+# Check watchdog
+if sudo -u "$ACTUAL_USER" launchctl print "gui/$(id -u $ACTUAL_USER)/com.labelprinter.watchdog" &>/dev/null; then
+    echo "      ✓ Watchdog service is running"
+else
+    echo "      ⚠ Watchdog may need re-login to start"
+fi
+
 echo ""
-echo "[4/4] Docker Desktop Configuration"
+echo "[5/5] Docker Desktop Configuration"
 echo ""
 echo "      IMPORTANT: Ensure Docker Desktop is set to start at login:"
 echo "      Docker Desktop → Settings → General → Start Docker Desktop when you sign in"
@@ -159,16 +187,20 @@ echo ""
 echo "Services installed:"
 echo "  • Print Agent (port 5001) - runs at boot as root"
 echo "  • Web App (port 5000)     - Docker container, starts at login"
+echo "  • Watchdog                - checks every 5 min, restarts if needed"
 echo ""
 echo "Useful commands:"
 echo "  Check print agent:    sudo launchctl print system/com.labelprinter.print-agent"
 echo "  Check web app:        launchctl print gui/\$(id -u)/com.labelprinter.web-app"
+echo "  Check watchdog:       launchctl print gui/\$(id -u)/com.labelprinter.watchdog"
 echo "  View print agent log: tail -f $PROJECT_DIR/logs/print-agent.log"
 echo "  View web app log:     tail -f $PROJECT_DIR/logs/docker-web-app.log"
+echo "  View watchdog log:    tail -f $PROJECT_DIR/logs/watchdog.log"
 echo ""
 echo "To uninstall:"
 echo "  sudo launchctl bootout system/com.labelprinter.print-agent"
 echo "  launchctl bootout gui/\$(id -u)/com.labelprinter.web-app"
+echo "  launchctl bootout gui/\$(id -u)/com.labelprinter.watchdog"
 echo "  sudo rm $DAEMON_DST"
-echo "  rm $AGENT_DST"
+echo "  rm $AGENT_DST $WATCHDOG_DST"
 echo ""

@@ -21,6 +21,12 @@ services:
       # Print agent URL - connects to native Mac service for Bluetooth printing
       - PRINT_AGENT_URL=http://host.docker.internal:5001
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Optional: Uncomment below for nginx reverse proxy and DuckDNS (external access)
   # nginx:

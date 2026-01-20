@@ -27,7 +27,11 @@
       "Bash(net stop:*)",
       "Bash(net start:*)",
       "Bash(if exist \"label-images\" rmdir /s /q \"label-images\")",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "WebFetch(domain:printer.tools)",
+      "WebFetch(domain:qrcode2stl.printer.tools)",
+      "Bash(pip3 list:*)",
+      "Bash(pip3 install:*)"
     ],
     "deny": []
   }

@@ -29,6 +29,12 @@ from ..services.events import bus
 from flask import stream_with_context
 
 api_bp = Blueprint('api', __name__)
+
+
+@api_bp.get('/health')
+def health_check():
+    """Health check endpoint for Docker and watchdog."""
+    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()}), 200
 @api_bp.get('/api/events')
 def sse_events():
     q = bus.subscribe()
