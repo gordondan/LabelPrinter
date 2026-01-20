@@ -11,6 +11,11 @@ services:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
       - ./batches:/app/batches
+      - ./recent:/app/recent
+      # Mount code for live updates (no rebuild needed)
+      - ./www:/app/www:ro
+      - ./label_server:/app/label_server:ro
+      - ./label-printer.py:/app/label-printer.py:ro
     environment:
       - TZ=${TZ:-America/New_York}
       # Print agent URL - connects to native Mac service for Bluetooth printing
