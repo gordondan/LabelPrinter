@@ -367,8 +367,13 @@
         statusEl.textContent = 'Submitting batch...';
         if (window.bumpJobsBadge) window.bumpJobsBadge();
 
+        // Delay between print jobs (minimal now that USB is properly released)
+        const PRINT_DELAY_MS = 500;
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
         let ok = 0, fail = 0;
-        for (const row of rows) {
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
             try {
                 const prevRes = await fetch('/api/pi-label/preview', {
                     method: 'POST',
@@ -387,7 +392,7 @@
 
                 let payload;
                 if (prev && prev.preview_path) {
-                    payload = { path: prev.preview_path };
+                    payload = { path: prev.preview_path, count: row.count };
                 } else {
                     payload = {
                         message: row.message,
@@ -408,6 +413,11 @@
                 if (!pr.ok) { throw new Error('print failed'); }
                 ok++;
                 statusEl.textContent = `Progress: ${ok}/${rows.length} (${fail} failed)`;
+
+                // Wait between prints to give the printer time to process
+                if (i < rows.length - 1) {
+                    await sleep(PRINT_DELAY_MS);
+                }
             } catch (err) {
                 fail++;
                 statusEl.textContent = `Error row ${ok + fail}: ${err.message || err}`;

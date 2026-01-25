@@ -150,21 +150,29 @@ def print_label():
         # Print the label(s)
         pause_between = float(config.get('pause_between_labels', 1))
 
-        for i in range(copies):
-            printer.print_pil_image(
-                image,
-                label_w_mm=label_w_mm,
-                label_h_mm=label_h_mm,
-                gap_mm=gap_mm,
-                density=density,
-                speed=speed,
-                direction=direction,
-                x=0, y=0, mode=0
-            )
+        try:
+            for i in range(copies):
+                printer.print_pil_image(
+                    image,
+                    label_w_mm=label_w_mm,
+                    label_h_mm=label_h_mm,
+                    gap_mm=gap_mm,
+                    density=density,
+                    speed=speed,
+                    direction=direction,
+                    x=0, y=0, mode=0
+                )
 
-            if i < copies - 1 and pause_between > 0:
-                import time
-                time.sleep(pause_between)
+                if i < copies - 1 and pause_between > 0:
+                    import time
+                    time.sleep(pause_between)
+        finally:
+            # Always release USB resources to prevent "Access denied" on next request
+            if hasattr(printer, 'close'):
+                try:
+                    printer.close()
+                except Exception:
+                    pass
 
         return jsonify({
             "ok": True,
