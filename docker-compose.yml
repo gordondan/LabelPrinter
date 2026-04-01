@@ -5,17 +5,29 @@ services:
       dockerfile: Dockerfile.app
     container_name: label-printer-app
     ports:
-      - "5000:5000"
+      - "3005:5000"
     volumes:
       - ./config:/app/config
       - ./uploads:/app/uploads
       - ./logs:/app/logs
       - ./batches:/app/batches
+      - ./recent:/app/recent
+      # Mount code for live updates (no rebuild needed)
+      - ./www:/app/www:ro
+      - ./label_server:/app/label_server:ro
+      - ./label-printer.py:/app/label-printer.py:ro
+      - ./version.py:/app/version.py:ro
     environment:
       - TZ=${TZ:-America/New_York}
       # Print agent URL - connects to native Mac service for Bluetooth printing
       - PRINT_AGENT_URL=http://host.docker.internal:5001
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Optional: Uncomment below for nginx reverse proxy and DuckDNS (external access)
   # nginx:

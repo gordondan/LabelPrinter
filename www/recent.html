@@ -1,169 +1,201 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Recent Labels</title>
-  <link rel="stylesheet" href="/link-grid.css" />
-  <link rel="stylesheet" href="/nav.css" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Recent Labels</title>
+    <link rel="stylesheet" href="/link-grid.css">
+    <link rel="stylesheet" href="/nav.css">
+    <style>
+        .controls-bar {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            padding: 0.625rem 1rem;
+            background: var(--lg-surface, #fff);
+            color: var(--lg-fg, #1e293b);
+            border: 1px solid var(--lg-border, #e2e8f0);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .control-btn:hover {
+            background: var(--lg-accent, #059669);
+            color: #fff;
+            border-color: var(--lg-accent, #059669);
+        }
+
+        .control-btn:active {
+            transform: scale(0.97);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--lg-fg, #64748b);
+        }
+
+        .empty-state h2 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            opacity: 0.7;
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            .control-btn {
+                min-height: 44px;
+                padding: 0.75rem 1.25rem;
+            }
+        }
+    </style>
 </head>
 <body>
 
-  <style>
-    .controls-bar {
-      position: fixed;
-      top: 80px;
-      right: 20px;
-      display: flex;
-      gap: 10px;
-      z-index: 100;
-    }
-    .control-btn {
-      padding: 8px 16px;
-      background: #4a9eff;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background 0.2s;
-    }
-    .control-btn:hover {
-      background: #357fd8;
-    }
-    .control-btn:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-  </style>
-
-  <script src="/nav.js"></script>
-  <script src="/link-grid.js"></script>
-  <script>
+<script src="/nav.js"></script>
+<script src="/link-grid.js"></script>
+<script>
     let showDeleted = false;
     let allItems = [];
     let deletedItems = new Set();
 
-    async function getRecentItems(){
-      const res = await fetch('/api/recent');
-      if (!res.ok) return [];
-      const data = await res.json();
-      // Store all items
-      allItems = (data.items || []).map(it => ({ image_url: it.image_url, path: it.path }));
+    async function getRecentItems() {
+        const res = await fetch('/api/recent');
+        if (!res.ok) return [];
+        const data = await res.json();
+        allItems = (data.items || []).map(it => ({ image_url: it.image_url, path: it.path }));
 
-      // Filter based on showDeleted flag
-      if (!showDeleted) {
-        return allItems.filter(it => !deletedItems.has(it.path));
-      }
-      return allItems;
+        if (!showDeleted) {
+            return allItems.filter(it => !deletedItems.has(it.path));
+        }
+        return allItems;
     }
 
-    async function doReprint(item){
-      const selectedPrinter = document.getElementById('printer-select').value;
+    async function doReprint(item) {
+        const labelSize = window.getSelectedLabelSize ? window.getSelectedLabelSize() : '1x3';
 
-      // Show printing status
-      const statusEl = document.querySelector('.lg-page > div[style*="position:fixed"]') ||
-                       document.querySelector('div[style*="position:fixed"][style*="bottom:12px"]');
-      if (statusEl) {
-        statusEl.textContent = 'Printing...';
-        statusEl.style.display = 'block';
-      }
-
-      const res = await fetch('/api/reprint', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: item.path, printer: selectedPrinter })
-      });
-      try {
-        const body = await res.json();
-        if (res.ok && body.ok) {
-          // Show success message
-          if (statusEl) {
-            statusEl.textContent = 'Label sent to printer!';
+        const statusEl = document.querySelector('.lg-status');
+        if (statusEl) {
+            statusEl.textContent = 'Printing...';
             statusEl.style.display = 'block';
-            setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
-          }
-          return;
         }
-        console.error('Reprint failed', body);
-        if (statusEl) {
-          statusEl.textContent = 'Print failed - check printer';
-          statusEl.style.display = 'block';
-          setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+
+        try {
+            const res = await fetch('/api/reprint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: item.path, label_size: labelSize })
+            });
+            const body = await res.json();
+            if (res.ok && body.ok) {
+                if (statusEl) {
+                    statusEl.textContent = 'Label sent to printer!';
+                    setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
+                }
+                if (window.bumpJobsBadge) window.bumpJobsBadge();
+            } else {
+                throw new Error('Print failed');
+            }
+        } catch {
+            if (statusEl) {
+                statusEl.textContent = 'Print failed';
+                setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+            }
         }
-      } catch {
-        if (statusEl) {
-          statusEl.textContent = 'Print error occurred';
-          statusEl.style.display = 'block';
-          setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
-        }
-      }
     }
 
-    async function doDelete(item){
-      const res = await fetch('/api/delete', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: item.path })
-      });
-      try {
-        const body = await res.json();
-        if (res.ok && body.ok) {
-          deletedItems.add(item.path);
-          return true;
+    async function doDelete(item) {
+        try {
+            const res = await fetch('/api/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: item.path })
+            });
+            const body = await res.json();
+            if (res.ok && body.ok) {
+                deletedItems.add(item.path);
+                return true;
+            }
+            return false;
+        } catch {
+            return false;
         }
-        return false;
-      } catch { return false; }
     }
 
     function hideAll() {
-      // Mark all current items as deleted (hidden)
-      allItems.forEach(item => deletedItems.add(item.path));
-      if (window.currentGrid) {
-        window.currentGrid.load();
-      }
+        allItems.forEach(item => deletedItems.add(item.path));
+        if (window.currentGrid) {
+            window.currentGrid.load();
+        }
     }
 
     function showAll() {
-      // Clear the deleted items set
-      deletedItems.clear();
-      showDeleted = false;
-      if (window.currentGrid) {
-        window.currentGrid.load();
-      }
+        deletedItems.clear();
+        showDeleted = false;
+        if (window.currentGrid) {
+            window.currentGrid.load();
+        }
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-      window.renderSiteHeader();
+        window.renderSiteHeader();
 
-      // Add control buttons
-      const controlsBar = document.createElement('div');
-      controlsBar.className = 'controls-bar';
+        // Create controls bar
+        const controlsBar = document.createElement('div');
+        controlsBar.className = 'controls-bar';
 
-      const hideAllBtn = document.createElement('button');
-      hideAllBtn.className = 'control-btn';
-      hideAllBtn.textContent = 'Hide All';
-      hideAllBtn.onclick = hideAll;
+        const hideAllBtn = document.createElement('button');
+        hideAllBtn.className = 'control-btn';
+        hideAllBtn.innerHTML = 'Hide All';
+        hideAllBtn.onclick = hideAll;
 
-      const showAllBtn = document.createElement('button');
-      showAllBtn.className = 'control-btn';
-      showAllBtn.textContent = 'Show All';
-      showAllBtn.onclick = showAll;
+        const showAllBtn = document.createElement('button');
+        showAllBtn.className = 'control-btn';
+        showAllBtn.innerHTML = 'Show All';
+        showAllBtn.onclick = showAll;
 
-      controlsBar.appendChild(hideAllBtn);
-      controlsBar.appendChild(showAllBtn);
-      document.body.appendChild(controlsBar);
+        controlsBar.appendChild(hideAllBtn);
+        controlsBar.appendChild(showAllBtn);
 
-      const mount = document.body; // link-grid creates its own centered wrapper
-      const grid = window.createLinkGrid({
-        mount,
-        getItems: getRecentItems,
-        cols: 4,
-        rows: 2,
-        onEnter: doReprint,
-        onDelete: doDelete,
-      });
-      window.currentGrid = grid; // Store grid reference for refresh
-      await grid.load();
+        // Insert controls before the grid
+        const mount = document.body;
+
+        const grid = window.createLinkGrid({
+            mount,
+            getItems: getRecentItems,
+            cols: 4,
+            rows: 3,
+            onEnter: doReprint,
+            onDelete: doDelete,
+        });
+
+        // Insert controls into the lg-page container after grid creates it
+        setTimeout(() => {
+            const lgPage = document.querySelector('.lg-page');
+            if (lgPage) {
+                lgPage.insertBefore(controlsBar, lgPage.querySelector('.lg-grid'));
+            }
+        }, 0);
+
+        window.currentGrid = grid;
+        await grid.load();
     });
-  </script>
+</script>
 </body>
 </html>

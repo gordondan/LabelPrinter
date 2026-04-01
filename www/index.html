@@ -1,119 +1,556 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Label Printer</title>
-    <link rel="stylesheet" href="/link-grid.css" />
-    <link rel="stylesheet" href="/nav.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Create Label</title>
+    <link rel="stylesheet" href="/site.css">
+    <link rel="stylesheet" href="/nav.css">
 </head>
 <body>
+<script src="/nav.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', ()=> {
+        window.renderSiteHeader();
+    });
+</script>
 
-    <div id="mount"></div>
+<div class="container">
+    <form id="printForm">
+        <div class="form-grid">
+            <!-- Message inputs (dynamic based on column count) -->
+            <div id="messageContainer" class="form-group full-width">
+                <label for="message_1">Message</label>
+                <input type="text" id="message_1" name="message_1" placeholder="What's on the label?">
+            </div>
 
-    <script src="/nav.js"></script>
-    <script src="/link-grid.js"></script>
-    <script>
-        // Configure the homepage link tiles here or fetch from an API/config.
-        // Each item: { href, image_url, title }
-        const HOME_LINKS = [
-            { image_url: '/images/Today-Label.png', title: 'Today Label', action: 'print-today', disabled: true },
-            { href: '/custom-label.html', image_url: '/images/Custom-Label.png', title: 'Custom Label' },
-            { href: '/recent.html', image_url: '/images/Recent-Labels.png', title: 'Recent Labels' }
-        ];
+            <!-- Quick toggles -->
+            <div class="form-group full-width checkbox-row">
+                <label>
+                    <input type="checkbox" id="show_date" name="show_date" checked>
+                    Today's Date
+                </label>
+                <label>
+                    <input type="checkbox" id="border" name="border" checked>
+                    Border
+                </label>
+            </div>
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            window.renderSiteHeader();
-            const mount = document.getElementById('mount');
-            const grid = window.createLinkGrid({
-                mount,
-                getItems: async () => HOME_LINKS,
-                cols: 4,
-                rows: 2,
-                onEnter: async (item) => {
-                    if (item.href) { window.location.href = item.href; return; }
-                    if (item.action === 'print-today') {
-                        try {
-                            grid.setBusy(item, true);
-                            grid.setStatus('Printing today\'s date…');
-                            // Use pre-generated today label
-                            const statusRes = await fetch('/api/today/status');
-                            const st = await statusRes.json().catch(()=>({ready:false}));
-                            if (!st.ready || !st.rel_path) throw new Error('Today label not ready');
-                            const selectedPrinter = document.getElementById('printer-select').value;
-                            const printRes = await fetch('/api/pi-label/print', {
-                                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ path: st.rel_path, printer: selectedPrinter })
-                            });
-                            const printBody = await printRes.json().catch(()=>({error:'Invalid response'}));
-                            if (!printRes.ok && !printBody.queued) throw new Error(printBody.errors ? printBody.errors.join(', ') : (printBody.error || 'Print failed'));
-                            grid.setStatus('Label sent to printer.');
-                        } catch (e) {
-                            grid.setStatus('Error: ' + (e.message || e));
-                        } finally {
-                            grid.setBusy(item, false);
-                        }
-                        return;
-                    }
-                }
-            });
-            await grid.load();
+            <!-- Preview area -->
+            <div class="form-group full-width">
+                <div id="previewContainer">
+                    <img id="previewImage" src="" alt="Label Preview">
+                </div>
+            </div>
 
-            // Fetch today status, ensure generation in background if needed, and update the tile
-            async function refreshTodayTile(){
-                try {
-                    const stRes = await fetch('/api/today/status');
-                    const st = await stRes.json().catch(()=>({ready:false}));
-                    const item = HOME_LINKS.find(x => x.action === 'print-today');
-                    if (!item) return;
-                    if (st.ready && st.rel_path){
-                        item.image_url = `/preview/file?path=${encodeURIComponent(st.rel_path)}&ts=${Date.now()}`;
-                        item.disabled = false;
-                    } else {
-                        // ask server to ensure it in background
-                        fetch('/api/today/ensure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: false }) }).catch(()=>{});
-                        item.disabled = true;
-                    }
-                    grid.setItems(HOME_LINKS);
-                } catch {}
-            }
-            refreshTodayTile();
+            <!-- Status message -->
+            <div id="statusMessage" class="full-width"></div>
 
-            // Subscribe to server-sent events to handle GPIO-triggered actions
-            try {
-                const es = new EventSource('/api/events');
-                es.onmessage = async (ev) => {
-                    try {
-                        const data = JSON.parse(ev.data || '{}');
-                        if (data && data.type === 'print-today') {
-                            const item = HOME_LINKS.find(x => x.action === 'print-today');
-                            if (!item) return;
-                            // Reuse pre-generated today label
-                            try {
-                                grid.setBusy(item, true);
-                                grid.setStatus('Printing today\'s date…');
-                                const statusRes = await fetch('/api/today/status');
-                                const st = await statusRes.json().catch(()=>({ready:false}));
-                                if (!st.ready || !st.rel_path) throw new Error('Today label not ready');
-                                const selectedPrinter = document.getElementById('printer-select').value;
-                                const printRes = await fetch('/api/pi-label/print', {
-                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ path: st.rel_path, printer: selectedPrinter })
-                                });
-                                const printBody = await printRes.json().catch(()=>({error:'Invalid response'}));
-                                if (!printRes.ok) throw new Error(printBody.errors ? printBody.errors.join(', ') : (printBody.error || 'Print failed'));
-                                grid.setStatus('Label sent to printer.');
-                            } catch (e) {
-                                grid.setStatus('Error: ' + (e.message || e));
-                            } finally {
-                                grid.setBusy(item, false);
-                            }
-                        }
-                    } catch {}
-                };
-            } catch {}
+            <!-- Print button -->
+            <div class="form-group full-width">
+                <button type="submit" id="submitButton" class="submit-btn" disabled>
+                    Print Label <span class="nav-hotkey">(p)</span>
+                </button>
+            </div>
+
+            <!-- Expandable Advanced Options -->
+            <div class="full-width">
+                <details id="advancedOptions">
+                    <summary>More options</summary>
+                    <div class="form-grid">
+                        <!-- Border Messages -->
+                        <div class="form-group">
+                            <label for="border_message">Top/Bottom Text</label>
+                            <input type="text" id="border_message" name="border_message" placeholder="Repeating text">
+                        </div>
+                        <div class="form-group">
+                            <label for="side_border">Side Text</label>
+                            <input type="text" id="side_border" name="side_border" placeholder="Repeating text">
+                        </div>
+
+                        <!-- Columns -->
+                        <div class="form-group">
+                            <label for="columns">Columns</label>
+                            <input type="number" id="columns" name="columns" value="1" min="1" max="6">
+                        </div>
+
+                        <!-- Padding -->
+                        <div class="form-group">
+                            <label for="padding">Padding (px)</label>
+                            <input type="number" id="padding" name="padding" value="0" min="0" max="100">
+                        </div>
+
+                        <!-- Count -->
+                        <div class="form-group">
+                            <label for="count">Copies</label>
+                            <input type="number" id="count" name="count" value="1" min="1" max="99">
+                        </div>
+
+                        <!-- Image Upload -->
+                        <div class="form-group full-width">
+                            <label>Image (optional)</label>
+                            <label for="imageUpload" class="file-input-wrapper" id="fileInputWrapper">
+                                <div>Tap to select an image</div>
+                                <div id="fileName">No file chosen</div>
+                            </label>
+                            <input type="file" id="imageUpload" name="imageFile" accept="image/png, image/jpeg, image/gif" style="display:none;">
+                            <div id="uploadPreviewContainer" style="display: none;">
+                                <img id="uploadPreviewImage" src="#" alt="Selected image">
+                                <button type="button" id="removeImageButton">Remove Image</button>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    // --- FORM ELEMENTS ---
+    const printForm = document.getElementById('printForm');
+    const submitButton = document.getElementById('submitButton');
+    const statusMessage = document.getElementById('statusMessage');
+    const previewImage = document.getElementById('previewImage');
+    const messageContainer = document.getElementById('messageContainer');
+
+    // --- IMAGE UPLOAD ELEMENTS ---
+    const imageUploadInput = document.getElementById('imageUpload');
+    const fileNameDisplay = document.getElementById('fileName');
+    const fileInputWrapper = document.getElementById('fileInputWrapper');
+    const uploadPreviewContainer = document.getElementById('uploadPreviewContainer');
+    const uploadPreviewImage = document.getElementById('uploadPreviewImage');
+    const removeImageButton = document.getElementById('removeImageButton');
+
+    // --- STATE ---
+    let debounceTimer = null;
+    let previewReady = false;
+    let lastPreviewPayload = null;
+    let lastPreviewPath = null;
+    let uploadedImagePath = null;
+    let uploadedImageSig = null;
+    let printCooldownActive = false;
+
+    // --- DYNAMIC COLUMN INPUTS ---
+    function getColumnCount() {
+        return parseInt(document.getElementById('columns').value) || 1;
+    }
+
+    function renderMessageInputs(count) {
+        // Preserve existing values
+        const existing = {};
+        messageContainer.querySelectorAll('input[type="text"]').forEach(el => {
+            existing[el.id] = el.value;
         });
-    </script>
 
-    </body>
-    </html>
+        messageContainer.innerHTML = '';
+        for (let i = 1; i <= count; i++) {
+            const label = document.createElement('label');
+            label.setAttribute('for', `message_${i}`);
+            label.textContent = count === 1 ? 'Message' : `Column ${i}`;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.id = `message_${i}`;
+            input.name = `message_${i}`;
+            input.placeholder = count === 1 ? "What's on the label?" : `Column ${i} text`;
+            if (existing[`message_${i}`] !== undefined) {
+                input.value = existing[`message_${i}`];
+            }
+            messageContainer.appendChild(label);
+            messageContainer.appendChild(input);
+        }
+    }
+
+    function onColumnsChanged() {
+        renderMessageInputs(getColumnCount());
+        updateQueryParams();
+        schedulePreviewDebounced();
+    }
+
+    // --- QUERY PARAMETER HANDLING ---
+    function applyQueryParams() {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.toString()) return;
+
+        // Apply columns first so inputs exist
+        if (params.has('columns')) {
+            document.getElementById('columns').value = params.get('columns');
+            renderMessageInputs(parseInt(params.get('columns')) || 1);
+        }
+
+        // Legacy single message param
+        if (params.has('message')) {
+            const el = document.getElementById('message_1');
+            if (el) el.value = params.get('message');
+        }
+        // Per-column message params (msg1, msg2, ...)
+        for (let i = 1; i <= 6; i++) {
+            if (params.has(`msg${i}`)) {
+                const el = document.getElementById(`message_${i}`);
+                if (el) el.value = params.get(`msg${i}`);
+            }
+        }
+
+        if (params.has('date'))
+            document.getElementById('show_date').checked = params.get('date') !== '0';
+        if (params.has('border'))
+            document.getElementById('border').checked = params.get('border') !== '0';
+        if (params.has('border_message'))
+            document.getElementById('border_message').value = params.get('border_message');
+        if (params.has('side_border'))
+            document.getElementById('side_border').value = params.get('side_border');
+        if (params.has('count'))
+            document.getElementById('count').value = params.get('count');
+        if (params.has('padding'))
+            document.getElementById('padding').value = params.get('padding');
+
+        if (params.has('size')) {
+            setTimeout(() => {
+                if (window.setLabelSize) window.setLabelSize(params.get('size'));
+            }, 150);
+        }
+
+        const advancedParams = ['border_message', 'side_border', 'padding'];
+        const hasAdvanced = advancedParams.some(p => {
+            const v = params.get(p);
+            if (p === 'padding') return v && v !== '0';
+            return v && v.trim() !== '';
+        });
+        if (hasAdvanced) {
+            document.getElementById('advancedOptions').open = true;
+        }
+    }
+
+    function updateQueryParams() {
+        const params = new URLSearchParams();
+        const colCount = getColumnCount();
+
+        // Save per-column messages
+        for (let i = 1; i <= colCount; i++) {
+            const el = document.getElementById(`message_${i}`);
+            if (el && el.value) params.set(colCount === 1 ? 'message' : `msg${i}`, el.value);
+        }
+
+        if (!document.getElementById('show_date').checked) params.set('date', '0');
+        if (!document.getElementById('border').checked) params.set('border', '0');
+
+        const borderMessage = document.getElementById('border_message').value;
+        if (borderMessage) params.set('border_message', borderMessage);
+        const sideBorder = document.getElementById('side_border').value;
+        if (sideBorder) params.set('side_border', sideBorder);
+        const count = document.getElementById('count').value;
+        if (count && count !== '1') params.set('count', count);
+        if (colCount > 1) params.set('columns', colCount);
+        const padding = document.getElementById('padding').value;
+        if (padding && padding !== '0') params.set('padding', padding);
+        const size = window.getSelectedLabelSize ? window.getSelectedLabelSize() : '1x3';
+        if (size && size !== '1x3') params.set('size', size);
+
+        const qs = params.toString();
+        const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+        history.replaceState(null, '', newUrl);
+    }
+
+    // Apply query params on load
+    applyQueryParams();
+
+    function updatePrintButtonState() {
+        submitButton.disabled = !previewReady || printCooldownActive;
+    }
+
+    function schedulePreviewDebounced() {
+        clearTimeout(debounceTimer);
+        previewReady = false;
+        updatePrintButtonState();
+        debounceTimer = setTimeout(generatePreview, 500);
+    }
+
+    function fileSignature(file) {
+        return file ? `${file.name}:${file.size}:${file.lastModified}` : null;
+    }
+
+    async function ensureImageUploaded() {
+        const file = imageUploadInput.files && imageUploadInput.files[0];
+        const sig = fileSignature(file);
+        if (!file) { uploadedImagePath = null; uploadedImageSig = null; return null; }
+        if (uploadedImageSig === sig && uploadedImagePath) return uploadedImagePath;
+        const imageUploadData = new FormData();
+        imageUploadData.append('imageFile', file);
+        const uploadResponse = await fetch('/api/upload', { method: 'POST', body: imageUploadData });
+        const uploadResult = await uploadResponse.json().catch(() => ({ error: 'Invalid response' }));
+        if (!uploadResponse.ok) throw new Error(uploadResult.error || 'Image upload failed.');
+        uploadedImagePath = uploadResult.filePath;
+        uploadedImageSig = sig;
+        return uploadedImagePath;
+    }
+
+    function buildPayload({ previewOnly }) {
+        const printPayload = {};
+        const formData = new FormData(printForm);
+        const colCount = getColumnCount();
+
+        // Collect per-column messages
+        const messages = [];
+        for (let i = 1; i <= colCount; i++) {
+            messages.push((formData.get(`message_${i}`) || '').toString().trim());
+        }
+
+        if (colCount > 1) {
+            printPayload.messages = messages;
+            printPayload.columns = colCount;
+        } else {
+            if (messages[0]) printPayload.message = messages[0];
+        }
+
+        const raw = {
+            border_message: (formData.get('border_message') || '').toString(),
+            side_border: (formData.get('side_border') || '').toString(),
+            count: (formData.get('count') || '').toString(),
+            padding: (formData.get('padding') || '').toString(),
+        };
+
+        if (raw.border_message.trim() !== '') printPayload.border_message = raw.border_message.trim();
+        if (raw.side_border.trim() !== '') printPayload.side_border = raw.side_border.trim();
+        printPayload.count = parseInt(raw.count.trim()) || 1;
+        const borderEl = document.getElementById('border');
+        printPayload.border = !!(borderEl && borderEl.checked);
+        const showDateEl = document.getElementById('show_date');
+        printPayload.show_date = !!(showDateEl && showDateEl.checked);
+        if (uploadedImagePath) printPayload.image = uploadedImagePath;
+
+        const paddingValue = parseInt(raw.padding.trim()) || 0;
+        if (paddingValue > 0) printPayload.padding = paddingValue;
+
+        if (window.getSelectedLabelSize) {
+            printPayload.label_size = window.getSelectedLabelSize();
+        }
+
+        return printPayload;
+    }
+
+    async function pollForPreview(timeoutMs = 2000, intervalMs = 250) {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            const testUrl = `/preview.png?ts=${Date.now()}`;
+            try {
+                await new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve();
+                    img.onerror = reject;
+                    img.src = testUrl;
+                });
+                return testUrl;
+            } catch {}
+            await new Promise(r => setTimeout(r, intervalMs));
+        }
+        return null;
+    }
+
+    async function generatePreview() {
+        try {
+            statusMessage.className = 'loading';
+            statusMessage.textContent = 'Generating preview\u2026';
+            statusMessage.style.visibility = 'visible';
+            previewReady = false;
+            document.getElementById('previewContainer').classList.add('loading');
+            updatePrintButtonState();
+            await ensureImageUploaded();
+            const payload = buildPayload({ previewOnly: true });
+            const res = await fetch('/api/pi-label/preview', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const body = await res.json().catch(() => ({ error: 'Invalid response' }));
+            if (!res.ok) throw new Error(body.errors ? body.errors.join(', ') : body.error || 'Preview failed.');
+            let url = body.preview_url;
+            lastPreviewPath = body.preview_path || null;
+            if (!url) {
+                url = await pollForPreview();
+            }
+            if (!url) throw new Error('No preview available.');
+            previewImage.src = `${url}&t=${Date.now()}`;
+            previewImage.style.display = 'block';
+            previewReady = true;
+            lastPreviewPayload = payload;
+            statusMessage.style.visibility = 'hidden';
+            statusMessage.className = '';
+            document.getElementById('previewContainer').classList.remove('loading');
+        } catch (err) {
+            previewReady = false;
+            lastPreviewPayload = null;
+            lastPreviewPath = null;
+            statusMessage.className = 'status-error';
+            statusMessage.textContent = `Error: ${err.message}`;
+            statusMessage.style.visibility = 'visible';
+            previewImage.style.display = 'none';
+        } finally {
+            document.getElementById('previewContainer').classList.remove('loading');
+            updatePrintButtonState();
+        }
+    }
+
+    // --- EVENT LISTENER FOR FILE SELECTION ---
+    imageUploadInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            fileNameDisplay.textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadPreviewImage.src = e.target.result;
+                uploadPreviewContainer.style.display = 'block';
+                fileInputWrapper.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+        schedulePreviewDebounced();
+    });
+
+    // --- EVENT LISTENER FOR REMOVE BUTTON ---
+    removeImageButton.addEventListener('click', () => {
+        imageUploadInput.value = '';
+        uploadPreviewContainer.style.display = 'none';
+        fileInputWrapper.style.display = 'block';
+        fileNameDisplay.textContent = 'No file chosen';
+        uploadedImagePath = null;
+        uploadedImageSig = null;
+        schedulePreviewDebounced();
+    });
+
+    // --- COLUMNS CHANGE ---
+    document.getElementById('columns').addEventListener('change', onColumnsChanged);
+    document.getElementById('columns').addEventListener('input', onColumnsChanged);
+
+    // --- AUTOPREVIEW ON INPUT CHANGES ---
+    printForm.addEventListener('input', (e) => {
+        const target = e.target;
+        if (!target || !(target instanceof HTMLElement)) return;
+        const tag = target.tagName.toLowerCase();
+        if (['border','show_date','date','columns'].includes(target.id)) return;
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+            updateQueryParams();
+            schedulePreviewDebounced();
+        }
+    });
+
+    // Trigger preview immediately on border/show_date toggles (no debounce)
+    document.getElementById('border').addEventListener('change', () => {
+        updateQueryParams();
+        generatePreview();
+    });
+    document.getElementById('show_date').addEventListener('change', () => {
+        updateQueryParams();
+        generatePreview();
+    });
+
+    // --- EVENT LISTENER FOR PRINT SUBMISSION ---
+    printForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!previewReady) { updateStatus('Generate a preview first.', 'error'); return; }
+
+        submitButton.disabled = true;
+        const originalText = submitButton.innerHTML;
+        submitButton.innerHTML = 'Printing\u2026';
+        statusMessage.className = 'loading';
+        statusMessage.textContent = 'Sending to printer\u2026';
+        statusMessage.style.visibility = 'visible';
+        document.getElementById('previewContainer').classList.add('loading');
+
+        try {
+            const currentPayload = buildPayload({ previewOnly: false });
+            const printPayload = lastPreviewPath
+                ? { path: lastPreviewPath, count: currentPayload.count }
+                : { ...(lastPreviewPayload || currentPayload) };
+            if (!lastPreviewPath) {
+                delete printPayload.preview_only;
+                if (uploadedImagePath) printPayload.image = uploadedImagePath;
+            }
+
+            // Get selected label size
+            if (window.getSelectedLabelSize) {
+                printPayload.label_size = window.getSelectedLabelSize();
+            }
+
+            if (window.bumpJobsBadge) window.bumpJobsBadge();
+            const printResponse = await fetch('/api/pi-label/print', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(printPayload)
+            });
+            const printResult = await printResponse.json().catch(() => ({ error: 'Invalid response' }));
+            if (!printResponse.ok) {
+                const errorMsg = printResult.errors ? printResult.errors.join(', ') : printResult.error;
+                throw new Error(errorMsg || 'Print command failed.');
+            }
+            updateStatus('Label sent to printer!', 'success');
+            if (printResult.preview_url) {
+                previewImage.src = `${printResult.preview_url}&t=${Date.now()}`;
+                previewImage.style.display = 'block';
+            }
+            printCooldownActive = true;
+            submitButton.innerHTML = 'Sent!';
+            submitButton.disabled = true;
+            document.getElementById('previewContainer').classList.remove('loading');
+            setTimeout(() => {
+                printCooldownActive = false;
+                submitButton.innerHTML = originalText;
+                updatePrintButtonState();
+            }, 3000);
+            return;
+        } catch (error) {
+            updateStatus(`Error: ${error.message}`, 'error');
+            submitButton.innerHTML = originalText;
+            updatePrintButtonState();
+        } finally {
+            document.getElementById('previewContainer').classList.remove('loading');
+        }
+    });
+
+    function updateStatus(message, type) {
+        statusMessage.textContent = message;
+        statusMessage.className = type ? `status-${type}` : '';
+        statusMessage.style.visibility = message ? 'visible' : 'hidden';
+    }
+
+    // Kick off an initial preview
+    schedulePreviewDebounced();
+
+    // Update preview aspect ratio and shape based on label size
+    function updatePreviewAspectRatio() {
+        const dims = window.getSelectedLabelDimensions ? window.getSelectedLabelDimensions() : { width: 3, height: 1 };
+        const container = document.getElementById('previewContainer');
+        if (container) {
+            container.style.aspectRatio = `${dims.width} / ${dims.height}`;
+            // Circle labels get rounded preview
+            if (dims.shape === 'circle') {
+                container.classList.add('circle-preview');
+            } else {
+                container.classList.remove('circle-preview');
+            }
+        }
+        updateQueryParams();
+    }
+
+    // Listen for label size changes
+    window.addEventListener('labelsizechange', () => {
+        updatePreviewAspectRatio();
+        schedulePreviewDebounced();
+    });
+
+    // Set initial aspect ratio after header renders
+    setTimeout(updatePreviewAspectRatio, 100);
+
+    // Global hotkey: 'p' to print
+    document.addEventListener('keydown', (ev) => {
+        const t = ev.target;
+        if (t && ((t.tagName === 'INPUT') || (t.tagName === 'TEXTAREA') || (t.isContentEditable))) return;
+        if ((ev.key || '').toLowerCase() !== 'p') return;
+        if (!previewReady) return;
+        ev.preventDefault();
+        submitButton.click();
+    }, { passive: false });
+</script>
+
+</body>
+</html>

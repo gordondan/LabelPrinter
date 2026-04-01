@@ -12,6 +12,13 @@ from urllib.parse import quote, unquote
 from datetime import datetime
 import traceback
 
+# Add project root to path for version import
+_project_root = Path(__file__).resolve().parent.parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from version import __version__, __build_date__
+
 from ..services.util import (
     allowed_file,
     find_latest_preview,
@@ -29,6 +36,21 @@ from ..services.events import bus
 from flask import stream_with_context
 
 api_bp = Blueprint('api', __name__)
+
+
+@api_bp.get('/health')
+def health_check():
+    """Health check endpoint for Docker and watchdog."""
+    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()}), 200
+
+
+@api_bp.get('/api/version')
+def get_version():
+    """Return the application version information."""
+    return jsonify({
+        'version': __version__,
+        'build_date': __build_date__
+    }), 200
 @api_bp.get('/api/events')
 def sse_events():
     q = bus.subscribe()
@@ -230,13 +252,17 @@ def api_reprint():
             result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
             elapsed_sec = time.perf_counter() - t0
             if result.returncode == 0:
+                # Mark as printed
+                save_request_data(p, original_request, printed=True)
                 return jsonify({'ok': True, 'elapsed_sec': round(elapsed_sec, 3), 'method': 'template_regeneration', 'stdout': (result.stdout or '').strip()})
             else:
                 return jsonify({'error': f'Template regeneration failed: {result.stderr}', 'fallback_reason': 'Falling back to direct image printing'}), 400
         except Exception:
             pass
 
-    # Fallback: direct BLE image printing
+    # Fallback: direct BLE image printing - also mark as printed
+    if original_request:
+        save_request_data(p, original_request, printed=True)
     ok, resp, code = print_png_via_ble(p, printer_name)
     return jsonify(resp), code
 
@@ -264,13 +290,48 @@ def build_command_from_payload(payload: dict):
         except (TypeError, ValueError):
             pass
 
+    # Handle messages array (independent column text) — join with pipe delimiter
+    messages = payload.get('messages')
+    message = payload.get('message')
+    if isinstance(messages, list) and any(m.strip() for m in messages if isinstance(m, str)):
+        combined = '|'.join(m.strip() if isinstance(m, str) else '' for m in messages)
+        cmd.extend(['-m', combined])
+    elif isinstance(message, str) and message.strip():
+        cmd.extend(['-m', message.strip()])
+
     mapping = [
-        ('message', '-m'), ('border_message', '-b'), ('side_border', '-s'), ('image', '-i'),
+        ('border_message', '-b'), ('side_border', '-s'), ('image', '-i'),
     ]
     for key, flag in mapping:
         val = payload.get(key)
         if isinstance(val, str) and val.strip():
             cmd.extend([flag, val.strip()])
+
+    # Handle label size
+    label_size = payload.get('label_size')
+    if isinstance(label_size, str) and label_size.strip():
+        cmd.extend(['-z', label_size.strip()])
+
+    # Handle columns
+    columns = payload.get('columns')
+    if columns is not None:
+        try:
+            columns_val = int(columns)
+            if columns_val > 1:
+                cmd.extend(['-C', str(columns_val)])
+        except (TypeError, ValueError):
+            pass
+
+    # Handle padding
+    padding = payload.get('padding')
+    if padding is not None:
+        try:
+            padding_val = int(padding)
+            if padding_val > 0:
+                cmd.extend(['--padding', str(padding_val)])
+        except (TypeError, ValueError):
+            pass
+
     return cmd
 
 
@@ -285,6 +346,22 @@ def validate_payload(payload: dict):
             errors.append("'count' must be an integer")
 
     # 'date' is no longer a script parameter; when present in payload it's user text content.
+
+    if 'columns' in payload and payload['columns'] is not None:
+        try:
+            columns_val = int(payload['columns'])
+            if columns_val < 1 or columns_val > 6:
+                errors.append("'columns' must be between 1 and 6")
+        except (TypeError, ValueError):
+            errors.append("'columns' must be an integer")
+
+    if 'padding' in payload and payload['padding'] is not None:
+        try:
+            padding_val = int(payload['padding'])
+            if padding_val < 0 or padding_val > 100:
+                errors.append("'padding' must be between 0 and 100")
+        except (TypeError, ValueError):
+            errors.append("'padding' must be an integer")
 
     img = payload.get('image')
     if img:
@@ -402,18 +479,52 @@ def post_pi_label_print():
 
     rel = data.get('path')
     printer_name = data.get('printer')
+    # Get copy count (default 1)
+    try:
+        copy_count = max(1, int(data.get('count', 1)))
+    except (TypeError, ValueError):
+        copy_count = 1
+
+    # Delay between copies to prevent printer from dropping commands (in seconds)
+    COPY_DELAY_SEC = 1.5
+
     if isinstance(rel, str) and rel.strip():
         p = safe_path_from_query(unquote(rel.strip()))
         if not p:
             return jsonify({'error': 'Invalid path'}), 400
-        current_app.logger.info("Queueing print PNG at: %s", p)
+        current_app.logger.info("Queueing print PNG at: %s (copies: %d)", p, copy_count)
+
+        # Mark as printed in request.json
+        from ..services.util import load_request_data
+        original_request, _ = load_request_data(p)
+        if original_request:
+            save_request_data(p, original_request, printed=True)
+
         jq = getattr(current_app, 'job_queue', None)
         if not jq:
-            ok, resp, code = print_png_via_ble(p, printer_name)
-            return jsonify(resp), code
-        # Enqueue direct image print
-        job = jq.enqueue('print', lambda: print_png_via_ble(p, printer_name), payload={'path': rel, 'printer': printer_name})
-        return jsonify({'queued': True, 'job_id': job.id, 'status': job.status}), 202
+            # No job queue - print synchronously with delays between copies
+            for i in range(copy_count):
+                if i > 0:
+                    time.sleep(COPY_DELAY_SEC)
+                ok, resp, code = print_png_via_ble(p, printer_name)
+                if not ok:
+                    return jsonify(resp), code
+            return jsonify({'ok': True, 'copies': copy_count}), 200
+
+        # Enqueue a job that handles multiple copies with delays
+        def _print_copies():
+            results = []
+            for i in range(copy_count):
+                if i > 0:
+                    time.sleep(COPY_DELAY_SEC)
+                ok, resp, code = print_png_via_ble(p, printer_name)
+                results.append({'copy': i + 1, 'ok': ok, 'code': code})
+                if not ok:
+                    return False, {'error': f'Copy {i+1} failed', 'results': results}, code
+            return True, {'ok': True, 'copies': copy_count, 'results': results}, 200
+
+        job = jq.enqueue('print', _print_copies, payload={'path': rel, 'printer': printer_name, 'copies': copy_count})
+        return jsonify({'queued': True, 'job_id': job.id, 'status': job.status, 'copies': copy_count}), 202
 
     ok, errors = validate_payload(data)
     if not ok:
@@ -450,7 +561,7 @@ def post_pi_label_print():
             reused_preview = find_existing_template_match(data)
             if reused_preview:
                 try:
-                    save_request_data(reused_preview, data)
+                    save_request_data(reused_preview, data, printed=True)
                 except Exception:
                     pass
                 return print_png_via_ble(reused_preview, printer_name)
@@ -463,7 +574,7 @@ def post_pi_label_print():
             if not preview_path:
                 raise RuntimeError('No preview generated')
             try:
-                save_request_data(preview_path, data)
+                save_request_data(preview_path, data, printed=True)
             except Exception:
                 pass
             return print_png_via_ble(preview_path, printer_name)
