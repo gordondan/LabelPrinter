@@ -703,9 +703,19 @@ def reconnect_bluetooth_device(device_name):
     """
 
 def draw_columns(image, draw, message, config, width_px, height_px, columns, padding, border_enabled):
-    """Render message text in multiple equal-width columns with dashed separator lines."""
-    if not message:
-        return
+    """Render independent text in multiple equal-width columns with dashed separator lines.
+
+    message can be a pipe-delimited string (e.g. "Col 1|Col 2") for independent column text.
+    If fewer messages than columns, remaining columns are left blank.
+    """
+    # Parse pipe-delimited messages into per-column texts
+    if message:
+        col_texts = [t.strip() for t in message.split('|')]
+    else:
+        col_texts = []
+    # Pad to match column count
+    while len(col_texts) < columns:
+        col_texts.append('')
 
     # Calculate content area (inside border + padding)
     border_offset = 10 if border_enabled else 0
@@ -726,18 +736,21 @@ def draw_columns(image, draw, message, config, width_px, height_px, columns, pad
     min_font = config.get('min_font_size', 10)
     max_font = config.get('max_font_size', 500)
 
-    # Find optimal font size for column dimensions (90% of column to leave breathing room)
     max_text_width = int(col_width * 0.9)
     max_text_height = int(content_height * 0.9)
 
-    font_size, lines, total_height = find_optimal_font_size_for_wrapped_text(
-        message, font_path, draw, max_text_width, max_text_height, min_font, max_font
-    )
-    font = ImageFont.truetype(font_path, font_size)
-
-    # Draw text in each column (same text, same size)
+    # Draw each column with its own text, independently sized
     line_spacing = 2
     for col in range(columns):
+        text = col_texts[col]
+        if not text:
+            continue
+
+        font_size, lines, total_height = find_optimal_font_size_for_wrapped_text(
+            text, font_path, draw, max_text_width, max_text_height, min_font, max_font
+        )
+        font = ImageFont.truetype(font_path, font_size)
+
         col_x = content_offset + col * (col_width + gap)
         col_center_x = col_x + col_width / 2
 

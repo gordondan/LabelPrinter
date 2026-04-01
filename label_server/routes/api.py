@@ -290,8 +290,17 @@ def build_command_from_payload(payload: dict):
         except (TypeError, ValueError):
             pass
 
+    # Handle messages array (independent column text) — join with pipe delimiter
+    messages = payload.get('messages')
+    message = payload.get('message')
+    if isinstance(messages, list) and any(m.strip() for m in messages if isinstance(m, str)):
+        combined = '|'.join(m.strip() if isinstance(m, str) else '' for m in messages)
+        cmd.extend(['-m', combined])
+    elif isinstance(message, str) and message.strip():
+        cmd.extend(['-m', message.strip()])
+
     mapping = [
-        ('message', '-m'), ('border_message', '-b'), ('side_border', '-s'), ('image', '-i'),
+        ('border_message', '-b'), ('side_border', '-s'), ('image', '-i'),
     ]
     for key, flag in mapping:
         val = payload.get(key)

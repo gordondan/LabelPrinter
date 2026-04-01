@@ -16,7 +16,7 @@
     try {
       const targetPath = new URL(href, window.location.origin).pathname;
       const current = currentPath();
-      if (href === '/' && (current === '/' || current === '/custom-label.html' || current === '/index.html')) return true;
+      if (href === '/' && (current === '/' || current === '/index.html')) return true;
       return targetPath === current;
     }
     catch { return false; }

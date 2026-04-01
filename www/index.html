@@ -20,10 +20,10 @@
 <div class="container">
     <form id="printForm">
         <div class="form-grid">
-            <!-- Main Message -->
-            <div class="form-group full-width">
-                <label for="message">Message</label>
-                <input type="text" id="message" name="message" placeholder="What's on the label?">
+            <!-- Message inputs (dynamic based on column count) -->
+            <div id="messageContainer" class="form-group full-width">
+                <label for="message_1">Message</label>
+                <input type="text" id="message_1" name="message_1" placeholder="What's on the label?">
             </div>
 
             <!-- Quick toggles -->
@@ -114,6 +114,7 @@
     const submitButton = document.getElementById('submitButton');
     const statusMessage = document.getElementById('statusMessage');
     const previewImage = document.getElementById('previewImage');
+    const messageContainer = document.getElementById('messageContainer');
 
     // --- IMAGE UPLOAD ELEMENTS ---
     const imageUploadInput = document.getElementById('imageUpload');
@@ -132,16 +133,66 @@
     let uploadedImageSig = null;
     let printCooldownActive = false;
 
-    // --- QUERY PARAMETER HANDLING ---
-    // Reads URL search params on load and sets form values.
-    // Updates URL on every form change so the state is always bookmarkable.
+    // --- DYNAMIC COLUMN INPUTS ---
+    function getColumnCount() {
+        return parseInt(document.getElementById('columns').value) || 1;
+    }
 
+    function renderMessageInputs(count) {
+        // Preserve existing values
+        const existing = {};
+        messageContainer.querySelectorAll('input[type="text"]').forEach(el => {
+            existing[el.id] = el.value;
+        });
+
+        messageContainer.innerHTML = '';
+        for (let i = 1; i <= count; i++) {
+            const label = document.createElement('label');
+            label.setAttribute('for', `message_${i}`);
+            label.textContent = count === 1 ? 'Message' : `Column ${i}`;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.id = `message_${i}`;
+            input.name = `message_${i}`;
+            input.placeholder = count === 1 ? "What's on the label?" : `Column ${i} text`;
+            if (existing[`message_${i}`] !== undefined) {
+                input.value = existing[`message_${i}`];
+            }
+            messageContainer.appendChild(label);
+            messageContainer.appendChild(input);
+        }
+    }
+
+    function onColumnsChanged() {
+        renderMessageInputs(getColumnCount());
+        updateQueryParams();
+        schedulePreviewDebounced();
+    }
+
+    // --- QUERY PARAMETER HANDLING ---
     function applyQueryParams() {
         const params = new URLSearchParams(window.location.search);
         if (!params.toString()) return;
 
-        if (params.has('message'))
-            document.getElementById('message').value = params.get('message');
+        // Apply columns first so inputs exist
+        if (params.has('columns')) {
+            document.getElementById('columns').value = params.get('columns');
+            renderMessageInputs(parseInt(params.get('columns')) || 1);
+        }
+
+        // Legacy single message param
+        if (params.has('message')) {
+            const el = document.getElementById('message_1');
+            if (el) el.value = params.get('message');
+        }
+        // Per-column message params (msg1, msg2, ...)
+        for (let i = 1; i <= 6; i++) {
+            if (params.has(`msg${i}`)) {
+                const el = document.getElementById(`message_${i}`);
+                if (el) el.value = params.get(`msg${i}`);
+            }
+        }
+
         if (params.has('date'))
             document.getElementById('show_date').checked = params.get('date') !== '0';
         if (params.has('border'))
@@ -152,23 +203,18 @@
             document.getElementById('side_border').value = params.get('side_border');
         if (params.has('count'))
             document.getElementById('count').value = params.get('count');
-        if (params.has('columns'))
-            document.getElementById('columns').value = params.get('columns');
         if (params.has('padding'))
             document.getElementById('padding').value = params.get('padding');
 
-        // Apply label size after header has rendered
         if (params.has('size')) {
             setTimeout(() => {
                 if (window.setLabelSize) window.setLabelSize(params.get('size'));
             }, 150);
         }
 
-        // Auto-open advanced options if any advanced param is set
-        const advancedParams = ['border_message', 'side_border', 'columns', 'padding'];
+        const advancedParams = ['border_message', 'side_border', 'padding'];
         const hasAdvanced = advancedParams.some(p => {
             const v = params.get(p);
-            if (p === 'columns') return v && v !== '1';
             if (p === 'padding') return v && v !== '0';
             return v && v.trim() !== '';
         });
@@ -179,28 +225,26 @@
 
     function updateQueryParams() {
         const params = new URLSearchParams();
+        const colCount = getColumnCount();
 
-        const message = document.getElementById('message').value;
-        if (message) params.set('message', message);
+        // Save per-column messages
+        for (let i = 1; i <= colCount; i++) {
+            const el = document.getElementById(`message_${i}`);
+            if (el && el.value) params.set(colCount === 1 ? 'message' : `msg${i}`, el.value);
+        }
 
         if (!document.getElementById('show_date').checked) params.set('date', '0');
         if (!document.getElementById('border').checked) params.set('border', '0');
 
         const borderMessage = document.getElementById('border_message').value;
         if (borderMessage) params.set('border_message', borderMessage);
-
         const sideBorder = document.getElementById('side_border').value;
         if (sideBorder) params.set('side_border', sideBorder);
-
         const count = document.getElementById('count').value;
         if (count && count !== '1') params.set('count', count);
-
-        const columns = document.getElementById('columns').value;
-        if (columns && columns !== '1') params.set('columns', columns);
-
+        if (colCount > 1) params.set('columns', colCount);
         const padding = document.getElementById('padding').value;
         if (padding && padding !== '0') params.set('padding', padding);
-
         const size = window.getSelectedLabelSize ? window.getSelectedLabelSize() : '1x3';
         if (size && size !== '1x3') params.set('size', size);
 
@@ -245,35 +289,40 @@
     function buildPayload({ previewOnly }) {
         const printPayload = {};
         const formData = new FormData(printForm);
+        const colCount = getColumnCount();
+
+        // Collect per-column messages
+        const messages = [];
+        for (let i = 1; i <= colCount; i++) {
+            messages.push((formData.get(`message_${i}`) || '').toString().trim());
+        }
+
+        if (colCount > 1) {
+            printPayload.messages = messages;
+            printPayload.columns = colCount;
+        } else {
+            if (messages[0]) printPayload.message = messages[0];
+        }
+
         const raw = {
-            message: (formData.get('message') || '').toString(),
             border_message: (formData.get('border_message') || '').toString(),
             side_border: (formData.get('side_border') || '').toString(),
             count: (formData.get('count') || '').toString(),
-            columns: (formData.get('columns') || '').toString(),
             padding: (formData.get('padding') || '').toString(),
         };
 
-        if (raw.message.trim() !== '') printPayload.message = raw.message.trim();
         if (raw.border_message.trim() !== '') printPayload.border_message = raw.border_message.trim();
         if (raw.side_border.trim() !== '') printPayload.side_border = raw.side_border.trim();
-        const countValue = parseInt(raw.count.trim()) || 1;
-        printPayload.count = countValue;
+        printPayload.count = parseInt(raw.count.trim()) || 1;
         const borderEl = document.getElementById('border');
         printPayload.border = !!(borderEl && borderEl.checked);
         const showDateEl = document.getElementById('show_date');
         printPayload.show_date = !!(showDateEl && showDateEl.checked);
         if (uploadedImagePath) printPayload.image = uploadedImagePath;
 
-        // Columns
-        const columnsValue = parseInt(raw.columns.trim()) || 1;
-        if (columnsValue > 1) printPayload.columns = columnsValue;
-
-        // Padding
         const paddingValue = parseInt(raw.padding.trim()) || 0;
         if (paddingValue > 0) printPayload.padding = paddingValue;
 
-        // Label size (always include for correct rendering)
         if (window.getSelectedLabelSize) {
             printPayload.label_size = window.getSelectedLabelSize();
         }
@@ -369,12 +418,16 @@
         schedulePreviewDebounced();
     });
 
+    // --- COLUMNS CHANGE ---
+    document.getElementById('columns').addEventListener('change', onColumnsChanged);
+    document.getElementById('columns').addEventListener('input', onColumnsChanged);
+
     // --- AUTOPREVIEW ON INPUT CHANGES ---
     printForm.addEventListener('input', (e) => {
         const target = e.target;
         if (!target || !(target instanceof HTMLElement)) return;
         const tag = target.tagName.toLowerCase();
-        if (['border','show_date','date'].includes(target.id)) return;
+        if (['border','show_date','date','columns'].includes(target.id)) return;
         if (tag === 'input' || tag === 'textarea' || tag === 'select') {
             updateQueryParams();
             schedulePreviewDebounced();
