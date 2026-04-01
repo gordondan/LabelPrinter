@@ -102,11 +102,11 @@ if docker ps -q -f name=label-printer-app 2>/dev/null | grep -q .; then
     docker rm label-printer-app 2>/dev/null || true
 fi
 
-# Kill any non-Docker process using port 5000
-PORT_5000_PID=$(lsof -ti :5000 2>/dev/null || true)
-if [[ -n "$PORT_5000_PID" ]]; then
-    echo "      Killing existing process on port 5000 (PID: $PORT_5000_PID)..."
-    kill -9 $PORT_5000_PID 2>/dev/null || true
+# Kill any non-Docker process using port 3005
+PORT_3005_PID=$(lsof -ti :3005 2>/dev/null || true)
+if [[ -n "$PORT_3005_PID" ]]; then
+    echo "      Killing existing process on port 3005 (PID: $PORT_3005_PID)..."
+    kill -9 $PORT_3005_PID 2>/dev/null || true
     sleep 1
 fi
 
@@ -186,7 +186,7 @@ echo "========================================"
 echo ""
 echo "Services installed:"
 echo "  • Print Agent (port 5001) - runs at boot as root"
-echo "  • Web App (port 5000)     - Docker container, starts at login"
+echo "  • Web App (port 3005)     - Docker container, starts at login"
 echo "  • Watchdog                - checks every 5 min, restarts if needed"
 echo ""
 echo "Useful commands:"

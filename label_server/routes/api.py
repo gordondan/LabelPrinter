@@ -12,6 +12,13 @@ from urllib.parse import quote, unquote
 from datetime import datetime
 import traceback
 
+# Add project root to path for version import
+_project_root = Path(__file__).resolve().parent.parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from version import __version__, __build_date__
+
 from ..services.util import (
     allowed_file,
     find_latest_preview,
@@ -35,6 +42,15 @@ api_bp = Blueprint('api', __name__)
 def health_check():
     """Health check endpoint for Docker and watchdog."""
     return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()}), 200
+
+
+@api_bp.get('/api/version')
+def get_version():
+    """Return the application version information."""
+    return jsonify({
+        'version': __version__,
+        'build_date': __build_date__
+    }), 200
 @api_bp.get('/api/events')
 def sse_events():
     q = bus.subscribe()
@@ -287,6 +303,26 @@ def build_command_from_payload(payload: dict):
     if isinstance(label_size, str) and label_size.strip():
         cmd.extend(['-z', label_size.strip()])
 
+    # Handle columns
+    columns = payload.get('columns')
+    if columns is not None:
+        try:
+            columns_val = int(columns)
+            if columns_val > 1:
+                cmd.extend(['-C', str(columns_val)])
+        except (TypeError, ValueError):
+            pass
+
+    # Handle padding
+    padding = payload.get('padding')
+    if padding is not None:
+        try:
+            padding_val = int(padding)
+            if padding_val > 0:
+                cmd.extend(['--padding', str(padding_val)])
+        except (TypeError, ValueError):
+            pass
+
     return cmd
 
 
@@ -301,6 +337,22 @@ def validate_payload(payload: dict):
             errors.append("'count' must be an integer")
 
     # 'date' is no longer a script parameter; when present in payload it's user text content.
+
+    if 'columns' in payload and payload['columns'] is not None:
+        try:
+            columns_val = int(payload['columns'])
+            if columns_val < 1 or columns_val > 6:
+                errors.append("'columns' must be between 1 and 6")
+        except (TypeError, ValueError):
+            errors.append("'columns' must be an integer")
+
+    if 'padding' in payload and payload['padding'] is not None:
+        try:
+            padding_val = int(payload['padding'])
+            if padding_val < 0 or padding_val > 100:
+                errors.append("'padding' must be between 0 and 100")
+        except (TypeError, ValueError):
+            errors.append("'padding' must be an integer")
 
     img = payload.get('image')
     if img:
@@ -418,11 +470,20 @@ def post_pi_label_print():
 
     rel = data.get('path')
     printer_name = data.get('printer')
+    # Get copy count (default 1)
+    try:
+        copy_count = max(1, int(data.get('count', 1)))
+    except (TypeError, ValueError):
+        copy_count = 1
+
+    # Delay between copies to prevent printer from dropping commands (in seconds)
+    COPY_DELAY_SEC = 1.5
+
     if isinstance(rel, str) and rel.strip():
         p = safe_path_from_query(unquote(rel.strip()))
         if not p:
             return jsonify({'error': 'Invalid path'}), 400
-        current_app.logger.info("Queueing print PNG at: %s", p)
+        current_app.logger.info("Queueing print PNG at: %s (copies: %d)", p, copy_count)
 
         # Mark as printed in request.json
         from ..services.util import load_request_data
@@ -432,11 +493,29 @@ def post_pi_label_print():
 
         jq = getattr(current_app, 'job_queue', None)
         if not jq:
-            ok, resp, code = print_png_via_ble(p, printer_name)
-            return jsonify(resp), code
-        # Enqueue direct image print
-        job = jq.enqueue('print', lambda: print_png_via_ble(p, printer_name), payload={'path': rel, 'printer': printer_name})
-        return jsonify({'queued': True, 'job_id': job.id, 'status': job.status}), 202
+            # No job queue - print synchronously with delays between copies
+            for i in range(copy_count):
+                if i > 0:
+                    time.sleep(COPY_DELAY_SEC)
+                ok, resp, code = print_png_via_ble(p, printer_name)
+                if not ok:
+                    return jsonify(resp), code
+            return jsonify({'ok': True, 'copies': copy_count}), 200
+
+        # Enqueue a job that handles multiple copies with delays
+        def _print_copies():
+            results = []
+            for i in range(copy_count):
+                if i > 0:
+                    time.sleep(COPY_DELAY_SEC)
+                ok, resp, code = print_png_via_ble(p, printer_name)
+                results.append({'copy': i + 1, 'ok': ok, 'code': code})
+                if not ok:
+                    return False, {'error': f'Copy {i+1} failed', 'results': results}, code
+            return True, {'ok': True, 'copies': copy_count, 'results': results}, 200
+
+        job = jq.enqueue('print', _print_copies, payload={'path': rel, 'printer': printer_name, 'copies': copy_count})
+        return jsonify({'queued': True, 'job_id': job.id, 'status': job.status, 'copies': copy_count}), 202
 
     ok, errors = validate_payload(data)
     if not ok:

@@ -57,7 +57,7 @@
 
             <!-- Expandable Advanced Options -->
             <div class="full-width">
-                <details>
+                <details id="advancedOptions">
                     <summary>More options</summary>
                     <div class="form-grid">
                         <!-- Border Messages -->
@@ -68,6 +68,18 @@
                         <div class="form-group">
                             <label for="side_border">Side Text</label>
                             <input type="text" id="side_border" name="side_border" placeholder="Repeating text">
+                        </div>
+
+                        <!-- Columns -->
+                        <div class="form-group">
+                            <label for="columns">Columns</label>
+                            <input type="number" id="columns" name="columns" value="1" min="1" max="6">
+                        </div>
+
+                        <!-- Padding -->
+                        <div class="form-group">
+                            <label for="padding">Padding (px)</label>
+                            <input type="number" id="padding" name="padding" value="0" min="0" max="100">
                         </div>
 
                         <!-- Count -->
@@ -120,14 +132,92 @@
     let uploadedImageSig = null;
     let printCooldownActive = false;
 
+    // --- QUERY PARAMETER HANDLING ---
+    // Reads URL search params on load and sets form values.
+    // Updates URL on every form change so the state is always bookmarkable.
+
+    function applyQueryParams() {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.toString()) return;
+
+        if (params.has('message'))
+            document.getElementById('message').value = params.get('message');
+        if (params.has('date'))
+            document.getElementById('show_date').checked = params.get('date') !== '0';
+        if (params.has('border'))
+            document.getElementById('border').checked = params.get('border') !== '0';
+        if (params.has('border_message'))
+            document.getElementById('border_message').value = params.get('border_message');
+        if (params.has('side_border'))
+            document.getElementById('side_border').value = params.get('side_border');
+        if (params.has('count'))
+            document.getElementById('count').value = params.get('count');
+        if (params.has('columns'))
+            document.getElementById('columns').value = params.get('columns');
+        if (params.has('padding'))
+            document.getElementById('padding').value = params.get('padding');
+
+        // Apply label size after header has rendered
+        if (params.has('size')) {
+            setTimeout(() => {
+                if (window.setLabelSize) window.setLabelSize(params.get('size'));
+            }, 150);
+        }
+
+        // Auto-open advanced options if any advanced param is set
+        const advancedParams = ['border_message', 'side_border', 'columns', 'padding'];
+        const hasAdvanced = advancedParams.some(p => {
+            const v = params.get(p);
+            if (p === 'columns') return v && v !== '1';
+            if (p === 'padding') return v && v !== '0';
+            return v && v.trim() !== '';
+        });
+        if (hasAdvanced) {
+            document.getElementById('advancedOptions').open = true;
+        }
+    }
+
+    function updateQueryParams() {
+        const params = new URLSearchParams();
+
+        const message = document.getElementById('message').value;
+        if (message) params.set('message', message);
+
+        if (!document.getElementById('show_date').checked) params.set('date', '0');
+        if (!document.getElementById('border').checked) params.set('border', '0');
+
+        const borderMessage = document.getElementById('border_message').value;
+        if (borderMessage) params.set('border_message', borderMessage);
+
+        const sideBorder = document.getElementById('side_border').value;
+        if (sideBorder) params.set('side_border', sideBorder);
+
+        const count = document.getElementById('count').value;
+        if (count && count !== '1') params.set('count', count);
+
+        const columns = document.getElementById('columns').value;
+        if (columns && columns !== '1') params.set('columns', columns);
+
+        const padding = document.getElementById('padding').value;
+        if (padding && padding !== '0') params.set('padding', padding);
+
+        const size = window.getSelectedLabelSize ? window.getSelectedLabelSize() : '1x3';
+        if (size && size !== '1x3') params.set('size', size);
+
+        const qs = params.toString();
+        const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+        history.replaceState(null, '', newUrl);
+    }
+
+    // Apply query params on load
+    applyQueryParams();
+
     function updatePrintButtonState() {
-        // Disable if: preview not ready, OR print cooldown active
         submitButton.disabled = !previewReady || printCooldownActive;
     }
 
     function schedulePreviewDebounced() {
         clearTimeout(debounceTimer);
-        // Disable button immediately when form changes
         previewReady = false;
         updatePrintButtonState();
         debounceTimer = setTimeout(generatePreview, 500);
@@ -160,6 +250,8 @@
             border_message: (formData.get('border_message') || '').toString(),
             side_border: (formData.get('side_border') || '').toString(),
             count: (formData.get('count') || '').toString(),
+            columns: (formData.get('columns') || '').toString(),
+            padding: (formData.get('padding') || '').toString(),
         };
 
         if (raw.message.trim() !== '') printPayload.message = raw.message.trim();
@@ -172,6 +264,20 @@
         const showDateEl = document.getElementById('show_date');
         printPayload.show_date = !!(showDateEl && showDateEl.checked);
         if (uploadedImagePath) printPayload.image = uploadedImagePath;
+
+        // Columns
+        const columnsValue = parseInt(raw.columns.trim()) || 1;
+        if (columnsValue > 1) printPayload.columns = columnsValue;
+
+        // Padding
+        const paddingValue = parseInt(raw.padding.trim()) || 0;
+        if (paddingValue > 0) printPayload.padding = paddingValue;
+
+        // Label size (always include for correct rendering)
+        if (window.getSelectedLabelSize) {
+            printPayload.label_size = window.getSelectedLabelSize();
+        }
+
         return printPayload;
     }
 
@@ -196,7 +302,7 @@
     async function generatePreview() {
         try {
             statusMessage.className = 'loading';
-            statusMessage.textContent = 'Generating preview…';
+            statusMessage.textContent = 'Generating preview\u2026';
             statusMessage.style.visibility = 'visible';
             previewReady = false;
             document.getElementById('previewContainer').classList.add('loading');
@@ -270,13 +376,20 @@
         const tag = target.tagName.toLowerCase();
         if (['border','show_date','date'].includes(target.id)) return;
         if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+            updateQueryParams();
             schedulePreviewDebounced();
         }
     });
 
     // Trigger preview immediately on border/show_date toggles (no debounce)
-    document.getElementById('border').addEventListener('change', generatePreview);
-    document.getElementById('show_date').addEventListener('change', generatePreview);
+    document.getElementById('border').addEventListener('change', () => {
+        updateQueryParams();
+        generatePreview();
+    });
+    document.getElementById('show_date').addEventListener('change', () => {
+        updateQueryParams();
+        generatePreview();
+    });
 
     // --- EVENT LISTENER FOR PRINT SUBMISSION ---
     printForm.addEventListener('submit', async (event) => {
@@ -285,14 +398,17 @@
 
         submitButton.disabled = true;
         const originalText = submitButton.innerHTML;
-        submitButton.innerHTML = 'Printing…';
+        submitButton.innerHTML = 'Printing\u2026';
         statusMessage.className = 'loading';
-        statusMessage.textContent = 'Sending to printer…';
+        statusMessage.textContent = 'Sending to printer\u2026';
         statusMessage.style.visibility = 'visible';
         document.getElementById('previewContainer').classList.add('loading');
 
         try {
-            const printPayload = lastPreviewPath ? { path: lastPreviewPath } : { ...(lastPreviewPayload || buildPayload({ previewOnly: false })) };
+            const currentPayload = buildPayload({ previewOnly: false });
+            const printPayload = lastPreviewPath
+                ? { path: lastPreviewPath, count: currentPayload.count }
+                : { ...(lastPreviewPayload || currentPayload) };
             if (!lastPreviewPath) {
                 delete printPayload.preview_only;
                 if (uploadedImagePath) printPayload.image = uploadedImagePath;
@@ -319,7 +435,6 @@
                 previewImage.src = `${printResult.preview_url}&t=${Date.now()}`;
                 previewImage.style.display = 'block';
             }
-            // Keep button disabled for 3 seconds after success to indicate completion
             printCooldownActive = true;
             submitButton.innerHTML = 'Sent!';
             submitButton.disabled = true;
@@ -329,7 +444,7 @@
                 submitButton.innerHTML = originalText;
                 updatePrintButtonState();
             }, 3000);
-            return; // Skip finally block's button reset
+            return;
         } catch (error) {
             updateStatus(`Error: ${error.message}`, 'error');
             submitButton.innerHTML = originalText;
@@ -348,20 +463,26 @@
     // Kick off an initial preview
     schedulePreviewDebounced();
 
-    // Update preview aspect ratio based on label size
+    // Update preview aspect ratio and shape based on label size
     function updatePreviewAspectRatio() {
         const dims = window.getSelectedLabelDimensions ? window.getSelectedLabelDimensions() : { width: 3, height: 1 };
         const container = document.getElementById('previewContainer');
         if (container) {
-            // Set aspect ratio CSS (width / height)
             container.style.aspectRatio = `${dims.width} / ${dims.height}`;
+            // Circle labels get rounded preview
+            if (dims.shape === 'circle') {
+                container.classList.add('circle-preview');
+            } else {
+                container.classList.remove('circle-preview');
+            }
         }
+        updateQueryParams();
     }
 
     // Listen for label size changes
     window.addEventListener('labelsizechange', () => {
         updatePreviewAspectRatio();
-        schedulePreviewDebounced(); // Regenerate preview with new size
+        schedulePreviewDebounced();
     });
 
     // Set initial aspect ratio after header renders

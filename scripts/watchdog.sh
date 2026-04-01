@@ -55,7 +55,7 @@ else
     fi
 
     # Also do a quick HTTP check
-    if ! curl -sf --max-time 5 http://localhost:5000/health &>/dev/null; then
+    if ! curl -sf --max-time 5 http://localhost:3005/health &>/dev/null; then
         log "Health endpoint not responding. Restarting container..."
         docker restart label-printer-app
         log "Container restarted due to unresponsive health endpoint"

@@ -417,6 +417,13 @@ details > .form-grid {
     min-height: 60px;
     aspect-ratio: 3 / 1; /* Default: 3" × 1" label */
     max-height: 300px;
+    transition: border-radius 0.2s ease;
+}
+
+/* Circle preview for round labels */
+#previewContainer.circle-preview {
+    border-radius: 50%;
+    overflow: hidden;
 }
 
 #previewImage {

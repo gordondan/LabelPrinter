@@ -392,22 +392,24 @@ def draw_centered_message(draw, message, font_path, width_px, space_start, space
     
     return message_font_size, final_lines, block_start_y
 
-def calculate_layout_spaces(width_px, height_px, printer_config, config, date_str, date_obj, 
-                           show_dates, show_main_message, show_border_message, show_side_border, draw, min_font, max_font):
+def calculate_layout_spaces(width_px, height_px, printer_config, config, date_str, date_obj,
+                           show_dates, show_main_message, show_border_message, show_side_border, draw, min_font, max_font, padding=0):
     """
     Calculate layout spaces using proper zone-based layout:
     - Top Zone (25%): Border text (readable right-side-up)
     - Middle Zone (50%): Main message or dates
     - Bottom Zone (25%): Border text (readable right-side-up, mirrored)
     - 3px padding throughout
+    - Extra padding insets content further from the border
     """
     layout = {}
-    
+
     # Calculate printable area inside the border (4px margin + 6px thickness = 10px from edges)
+    # Plus any extra user-specified padding
     border_margin = 4
     border_thickness = 6
-    border_offset = border_margin + border_thickness
-    
+    border_offset = border_margin + border_thickness + padding
+
     printable_width = width_px - (2 * border_offset)
     printable_height = height_px - (2 * border_offset)
     printable_start_y = border_offset
@@ -699,8 +701,66 @@ def reconnect_bluetooth_device(device_name):
     On Raspberry Pi, BLE connection is handled automatically by the BLE routines in rw402b_ble/printer.py.
     No manual reconnect is needed; a new connection will be attempted each print.
     """
-    
-def generate_label_image(date_str, date_obj, config, printer_config, message=None, border_message=None, side_border=None, show_date=False, image_path=None, logger=None, border_enabled=True):
+
+def draw_columns(image, draw, message, config, width_px, height_px, columns, padding, border_enabled):
+    """Render message text in multiple equal-width columns with dashed separator lines."""
+    if not message:
+        return
+
+    # Calculate content area (inside border + padding)
+    border_offset = 10 if border_enabled else 0
+    content_offset = border_offset + padding
+
+    content_width = width_px - (2 * content_offset)
+    content_height = height_px - (2 * content_offset)
+
+    if content_width <= 0 or content_height <= 0:
+        return
+
+    # Column geometry: gap between columns for separator lines
+    gap = 2
+    total_gaps = (columns - 1) * gap
+    col_width = (content_width - total_gaps) / columns
+
+    font_path = config.get('font_path', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
+    min_font = config.get('min_font_size', 10)
+    max_font = config.get('max_font_size', 500)
+
+    # Find optimal font size for column dimensions (90% of column to leave breathing room)
+    max_text_width = int(col_width * 0.9)
+    max_text_height = int(content_height * 0.9)
+
+    font_size, lines, total_height = find_optimal_font_size_for_wrapped_text(
+        message, font_path, draw, max_text_width, max_text_height, min_font, max_font
+    )
+    font = ImageFont.truetype(font_path, font_size)
+
+    # Draw text in each column (same text, same size)
+    line_spacing = 2
+    for col in range(columns):
+        col_x = content_offset + col * (col_width + gap)
+        col_center_x = col_x + col_width / 2
+
+        # Vertical centering within column
+        y_pos = content_offset + (content_height - total_height) / 2
+
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            line_width = bbox[2] - bbox[0]
+            line_height = bbox[3] - bbox[1]
+            x = col_center_x - line_width / 2 - bbox[0]
+            y = y_pos - bbox[1]
+            draw_text_with_bold_effect(draw, (int(x), int(y)), line, font)
+            y_pos += line_height + line_spacing
+
+    # Draw dashed separator lines between columns (cutting guides)
+    for col in range(1, columns):
+        sep_x = int(content_offset + col * (col_width + gap) - gap / 2)
+        for y in range(content_offset, content_offset + content_height, 8):
+            end_y = min(y + 4, content_offset + content_height)
+            draw.line([(sep_x, y), (sep_x, end_y)], fill=180, width=1)
+
+def generate_label_image(date_str, date_obj, config, printer_config, message=None, border_message=None, side_border=None, show_date=False, image_path=None, logger=None, border_enabled=True, columns=1, padding=0):
     """Generate a label image with dates and/or message."""
     # Create image based on printer-specific settings
     width_px = int(printer_config['label_width_in'] * printer_config['dpi'])
@@ -708,50 +768,64 @@ def generate_label_image(date_str, date_obj, config, printer_config, message=Non
     image = Image.new('L', (width_px, height_px), 255)
     draw = ImageDraw.Draw(image)
 
+    # Draw border first (so content renders on top)
+    if border_enabled:
+        draw_border(draw, width_px, height_px)
+
+    # Column mode: divide label into equal columns, disable date/border zones
+    if columns > 1:
+        draw_columns(image, draw, message, config, width_px, height_px, columns, padding, border_enabled)
+        # Debug output
+        print(f"\n=== Debug Info ===")
+        print(f"Column mode: {columns} columns")
+        if message:
+            print(f"Message: '{message}' (length: {len(message)})")
+        print(f"Padding: {padding}px")
+        print(f"Label dimensions: {width_px}x{height_px}")
+        image.save("label_preview.png")
+        return image
+
+    # Standard single-column mode
     # Get font configuration
     min_font = config.get('min_font_size', 10)
     max_font = config.get('max_font_size', 500)
-    
+
     # Determine what content to show
     show_dates = show_date  # Now dates are only shown when -o flag is present
     show_main_message = message is not None
     show_border_message = border_message is not None
     show_side_border = side_border is not None
-    
+
     # Calculate layout spaces based on what content we're showing
-    layout = calculate_layout_spaces(width_px, height_px, printer_config, config, date_str, date_obj, 
-                                    show_dates, show_main_message, show_border_message, show_side_border, draw, min_font, max_font)
-    
+    layout = calculate_layout_spaces(width_px, height_px, printer_config, config, date_str, date_obj,
+                                    show_dates, show_main_message, show_border_message, show_side_border, draw, min_font, max_font, padding=padding)
+
     # Layout calculation complete
-    
+
     # Load and process user image if provided
     user_image = None
     if image_path:
         printable_width = layout.get('printable_width', width_px - 20)
         printable_height = layout.get('printable_height', height_px - 20)
         user_image = load_and_process_image(image_path, printable_width, printable_height, logger)
-        
+
         # Paste the image onto the label (behind text content)
         if user_image:
             paste_image_on_label(image, user_image, layout)
-    
+
     # Draw each type of content in its allocated space (over the image)
     if show_dates:
         draw_dates(image, draw, date_str, config, layout, show_border_message)
-    
+
     if show_main_message:
         draw_main_message(image, draw, message, config, layout, width_px)
-    
+
     if show_border_message:
         draw_border_message(image, draw, border_message, config, layout, width_px)
-    
+
     if show_side_border:
         draw_side_border_message(image, draw, side_border, config, layout, width_px, height_px)
-    
-    # Draw border if enabled
-    if border_enabled:
-        draw_border(draw, width_px, height_px)
-    
+
     # Debug output
     print(f"\n=== Debug Info ===")
     print(f"Show dates: {show_dates}")
@@ -763,8 +837,10 @@ def generate_label_image(date_str, date_obj, config, printer_config, message=Non
         print(f"Border message: '{border_message}' (length: {len(border_message)})")
     if show_side_border:
         print(f"Side border message: '{side_border}' (length: {len(side_border)})")
+    if padding > 0:
+        print(f"Padding: {padding}px")
     print(f"Label dimensions: {width_px}x{height_px}")
-    
+
     image.save("label_preview.png")  # Optional preview
     return image
 
@@ -893,8 +969,11 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--preview-only', action='store_true',
                         help='Generate label image only (do not print to printer)')
     parser.add_argument('-z', '--label-size', type=str, default='1x3',
-                        choices=['1x3', '2.25x1.25', '4x6'],
-                        help='Label size: 1x3 (1"x3"), 2.25x1.25 (2.25"x1.25"), or 4x6 (4"x6"). Default: 1x3')
+                        help='Label size preset or custom WxH in inches (e.g., 3x2). Presets: 1x3, 2.25x1, 2.25x1.25, 2x2, 4x6. Default: 1x3')
+    parser.add_argument('-C', '--columns', type=int, default=1,
+                        help='Number of columns (1-6). Text is sized to fit column width; date/border zones disabled. Default: 1')
+    parser.add_argument('--padding', type=int, default=0,
+                        help='Extra padding in pixels inside the border. Default: 0')
     args = parser.parse_args()
     
     # Log the command execution
@@ -917,16 +996,34 @@ if __name__ == "__main__":
     # Override dimensions based on label size argument
     # Format: 'id': {'label_width_in': W, 'label_height_in': H}
     LABEL_SIZES = {
-        '1x3': {'label_width_in': 3.0, 'label_height_in': 1.0},       # 3" wide × 1" tall
-        '2.25x1.25': {'label_width_in': 2.25, 'label_height_in': 1.25},  # 2.25" wide × 1.25" tall
-        '4x6': {'label_width_in': 4.0, 'label_height_in': 6.0},       # 4" wide × 6" tall (shipping)
+        '1x3': {'label_width_in': 3.0, 'label_height_in': 1.0},           # 3" wide × 1" tall
+        '2.25x1': {'label_width_in': 2.25, 'label_height_in': 1.0},       # 2.25" wide × 1" tall
+        '2.25x1.25': {'label_width_in': 2.25, 'label_height_in': 1.25},   # 2.25" wide × 1.25" tall
+        '2x2': {'label_width_in': 2.0, 'label_height_in': 2.0},           # 2" circle
+        '4x6': {'label_width_in': 4.0, 'label_height_in': 6.0},           # 4" wide × 6" tall (shipping)
     }
     if args.label_size in LABEL_SIZES:
         size_override = LABEL_SIZES[args.label_size]
         printer_config = dict(printer_config)  # copy to avoid modifying original
         printer_config['label_height_in'] = size_override['label_height_in']
         printer_config['label_width_in'] = size_override['label_width_in']
-        logger.log(f"Using label size: {args.label_size} ({size_override['label_height_in']}\" x {size_override['label_width_in']}\")")
+        logger.log(f"Using label size: {args.label_size} ({size_override['label_width_in']}\" x {size_override['label_height_in']}\")")
+    else:
+        # Try custom WxH format (e.g., "3x2" for 3" wide × 2" tall)
+        try:
+            parts = args.label_size.split('x')
+            if len(parts) == 2:
+                w = float(parts[0])
+                h = float(parts[1])
+                if 0.5 <= w <= 12 and 0.5 <= h <= 12:
+                    printer_config = dict(printer_config)
+                    printer_config['label_width_in'] = w
+                    printer_config['label_height_in'] = h
+                    logger.log(f"Using custom label size: {w}\" x {h}\"")
+                else:
+                    logger.log(f"Custom size out of range (0.5-12\"): {args.label_size}")
+        except ValueError:
+            logger.log(f"Unknown label size '{args.label_size}', using printer default")
 
     # Get the actual Windows printer name from the printer config
     windows_printer_name = None
@@ -952,11 +1049,14 @@ if __name__ == "__main__":
     _t0 = time.perf_counter()
     # Determine border enablement from environment (set by server); defaults to enabled
     border_enabled = os.environ.get('LABEL_BORDER_ENABLED', '1') != '0'
+    # Clamp columns and padding to valid ranges
+    columns = max(1, min(6, args.columns))
+    padding = max(0, min(100, args.padding))
     label_img = generate_label_image(
         date_str, date_obj, config, printer_config,
         args.message, args.border_message, args.side_border,
         args.show_date, args.image, logger,
-        border_enabled=border_enabled
+        border_enabled=border_enabled, columns=columns, padding=padding
     )
     _profile['image_generation'] = time.perf_counter() - _t0
     print(f"Label image generated for: {date_str}")
