@@ -139,9 +139,23 @@ def print_label():
             error_msg = f"No printer backend available. USB error: {usb_error}" if usb_error else "No printer backend available"
             return jsonify({"ok": False, "error": error_msg}), 500
 
-        # Calculate label dimensions in mm
-        label_w_mm = float(printer_cfg.get('label_width_in', 3)) * 25.4
-        label_h_mm = float(printer_cfg.get('label_height_in', 1)) * 25.4
+        # Calculate label dimensions in mm. Prefer the actual image dimensions
+        # (sent by the server based on the preview PNG) so the user-selected
+        # label size reaches the printer's TSPL SIZE command. Fall back to the
+        # printer config defaults when the request doesn't supply them.
+        dpi_for_size = int(printer_cfg.get('dpi', 203))
+        img_w_px = data.get('image_width_px')
+        img_h_px = data.get('image_height_px')
+        try:
+            if img_w_px and img_h_px and dpi_for_size > 0:
+                label_w_mm = (float(img_w_px) / dpi_for_size) * 25.4
+                label_h_mm = (float(img_h_px) / dpi_for_size) * 25.4
+            else:
+                label_w_mm = float(printer_cfg.get('label_width_in', 3)) * 25.4
+                label_h_mm = float(printer_cfg.get('label_height_in', 1)) * 25.4
+        except (TypeError, ValueError):
+            label_w_mm = float(printer_cfg.get('label_width_in', 3)) * 25.4
+            label_h_mm = float(printer_cfg.get('label_height_in', 1)) * 25.4
         gap_mm = float(printer_cfg.get('gap_mm', 3.0))
         density = int(printer_cfg.get('density', 8))
         speed = int(printer_cfg.get('speed', 4))

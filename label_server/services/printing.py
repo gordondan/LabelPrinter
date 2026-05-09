@@ -72,6 +72,7 @@ def print_via_agent(p: Path, printer_name: str = None, copies: int = 1):
 
     try:
         img = Image.open(p)
+        img_w_px, img_h_px = img.size
         # Convert to PNG bytes
         buf = io.BytesIO()
         img.save(buf, format='PNG')
@@ -82,6 +83,8 @@ def print_via_agent(p: Path, printer_name: str = None, copies: int = 1):
     payload = {
         'image_base64': image_base64,
         'copies': copies,
+        'image_width_px': img_w_px,
+        'image_height_px': img_h_px,
     }
     if printer_name:
         payload['printer_name'] = printer_name
@@ -129,8 +132,22 @@ def print_png_via_ble(p: Path, printer_name: str = None):
 
     try:
         dpi = int(pcfg.get('dpi', 203))
-        w_in = float(pcfg.get('label_width_in', 2.25))
-        h_in = float(pcfg.get('label_height_in', 1.25))
+        # Derive label dimensions from the image so the user-selected label size
+        # propagates to the printer's TSPL SIZE command. The image was rendered at
+        # exactly label_width_in*dpi by label_height_in*dpi pixels (see
+        # label-printer.py:779-780), so this inversion recovers the chosen size.
+        # Fall back to printer config dimensions if the image isn't usable.
+        try:
+            img_w_in = img.width / dpi
+            img_h_in = img.height / dpi
+            if img_w_in > 0 and img_h_in > 0:
+                w_in, h_in = img_w_in, img_h_in
+            else:
+                w_in = float(pcfg.get('label_width_in', 2.25))
+                h_in = float(pcfg.get('label_height_in', 1.25))
+        except Exception:
+            w_in = float(pcfg.get('label_width_in', 2.25))
+            h_in = float(pcfg.get('label_height_in', 1.25))
         gap_mm = float(pcfg.get('gap_mm', 3.0))
         density = int(pcfg.get('density', 8))
         speed = int(pcfg.get('speed', 4))
