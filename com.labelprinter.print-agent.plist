@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template, not a directly installable plist.
+
+  The PROJECT_DIR placeholder tokens below are substituted with this checkout's
+  real location by scripts/install-print-agent.sh. Do NOT write absolute paths
+  in here and do not copy this file into ~/Library/LaunchAgents by hand:
+  hardcoded paths rot silently when the checkout moves, which is exactly how
+  this job sat dead from 2026-01-26 to 2026-08-26 while still pointing at
+  ~/Documents/GitHub, with launchd reporting only a bare exit 78.
+
+  Install with:  ./scripts/install-print-agent.sh
+-->
 <plist version="1.0">
 <dict>
     <key>Label</key>
@@ -7,12 +19,12 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/gordon/source/repos/LabelPrinter/.venv/bin/python</string>
-        <string>/Users/gordon/source/repos/LabelPrinter/print_agent.py</string>
+        <string>__PROJECT_DIR__/.venv/bin/python</string>
+        <string>__PROJECT_DIR__/print_agent.py</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/gordon/source/repos/LabelPrinter</string>
+    <string>__PROJECT_DIR__</string>
 
     <key>RunAtLoad</key>
     <true/>
@@ -21,10 +33,10 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/gordon/source/repos/LabelPrinter/logs/print-agent.log</string>
+    <string>__PROJECT_DIR__/logs/print-agent.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/gordon/source/repos/LabelPrinter/logs/print-agent-error.log</string>
+    <string>__PROJECT_DIR__/logs/print-agent-error.log</string>
 
     <key>EnvironmentVariables</key>
     <dict>
