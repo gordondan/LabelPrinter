@@ -37,3 +37,20 @@ Logs/
 logs/
 ./recent
 recent/
+
+# Generated search-skill reports that land in the repo root (commuter-car,
+# david-job, jacob-job, truck searches). Generated output, not source.
+/*.xlsx
+/commuter-car-data.json
+/david-job-data.json
+/jacob-job-data.json
+/truck-data.json
+
+# Generated QR model for the :3005 host. The other qrcode_littlemac_*.stl and
+# LabelPrinterQR* models ARE tracked assets — do not broaden these patterns.
+/qrcode_littlemac_3005_*.stl
+/qrcode_littlemac_3005_*.3mf
+
+# Runtime uploads. The sample PNGs already tracked here are unaffected;
+# gitignore does not untrack files.
+/uploads/*
