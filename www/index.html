@@ -5,105 +5,112 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>Create Label</title>
+    <title>Label Pro</title>
     <link rel="stylesheet" href="/site.css">
     <link rel="stylesheet" href="/nav.css">
 </head>
 <body>
 <script src="/nav.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', ()=> {
-        window.renderSiteHeader();
-    });
-</script>
+<script>document.addEventListener('DOMContentLoaded', () => window.renderSiteHeader());</script>
 
 <div class="container">
     <form id="printForm">
-        <div class="form-grid">
-            <!-- Message inputs (dynamic based on column count) -->
-            <div id="messageContainer" class="form-group full-width">
-                <label for="message_1">Message</label>
-                <input type="text" id="message_1" name="message_1" placeholder="What's on the label?">
+        <!-- Live Preview -->
+        <div class="section-label">Live Preview</div>
+        <div class="preview-card">
+            <div id="previewContainer">
+                <img id="previewImage" src="" alt="Label Preview">
             </div>
+        </div>
 
-            <!-- Quick toggles -->
-            <div class="form-group full-width checkbox-row">
-                <label>
-                    <input type="checkbox" id="show_date" name="show_date" checked>
-                    Today's Date
-                </label>
-                <label>
-                    <input type="checkbox" id="border" name="border" checked>
-                    Border
-                </label>
-            </div>
+        <!-- Column message inputs -->
+        <div id="messageContainer" class="message-inputs">
+            <label for="message_1">Message</label>
+            <input type="text" id="message_1" name="message_1" placeholder="What's on the label?">
+        </div>
 
-            <!-- Preview area -->
-            <div class="form-group full-width">
-                <div id="previewContainer">
-                    <img id="previewImage" src="" alt="Label Preview">
+        <!-- Toggle row -->
+        <div class="toggle-row">
+            <label class="toggle-label">
+                <input type="checkbox" id="show_date" name="show_date" checked>
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">Today's Date</span>
+            </label>
+            <label class="toggle-label">
+                <input type="checkbox" id="border" name="border" checked>
+                <span class="toggle-switch"></span>
+                <span class="toggle-text">Border</span>
+            </label>
+        </div>
+
+        <!-- Status message -->
+        <div id="statusMessage"></div>
+
+        <!-- Row 1: Columns | Copies -->
+        <div class="option-row">
+            <div class="option-group">
+                <div class="option-label">Columns</div>
+                <div class="segmented-control" id="columnsControl">
+                    <button type="button" class="seg-btn active" data-value="1">1 Col</button>
+                    <button type="button" class="seg-btn" data-value="2">2 Cols</button>
+                    <button type="button" class="seg-btn" data-value="3">3 Cols</button>
                 </div>
+                <input type="hidden" id="columns" name="columns" value="1">
             </div>
-
-            <!-- Status message -->
-            <div id="statusMessage" class="full-width"></div>
-
-            <!-- Print button -->
-            <div class="form-group full-width">
-                <button type="submit" id="submitButton" class="submit-btn" disabled>
-                    Print Label <span class="nav-hotkey">(p)</span>
-                </button>
+            <div class="option-group">
+                <div class="option-label">Copies</div>
+                <input type="number" id="count" name="count" value="1" min="1" max="99">
             </div>
+        </div>
 
-            <!-- Expandable Advanced Options -->
-            <div class="full-width">
-                <details id="advancedOptions">
-                    <summary>More options</summary>
-                    <div class="form-grid">
-                        <!-- Border Messages -->
-                        <div class="form-group">
-                            <label for="border_message">Top/Bottom Text</label>
-                            <input type="text" id="border_message" name="border_message" placeholder="Repeating text">
-                        </div>
-                        <div class="form-group">
-                            <label for="side_border">Side Text</label>
-                            <input type="text" id="side_border" name="side_border" placeholder="Repeating text">
-                        </div>
-
-                        <!-- Columns -->
-                        <div class="form-group">
-                            <label for="columns">Columns</label>
-                            <input type="number" id="columns" name="columns" value="1" min="1" max="6">
-                        </div>
-
-                        <!-- Padding -->
-                        <div class="form-group">
-                            <label for="padding">Padding (px)</label>
-                            <input type="number" id="padding" name="padding" value="0" min="0" max="100">
-                        </div>
-
-                        <!-- Count -->
-                        <div class="form-group">
-                            <label for="count">Copies</label>
-                            <input type="number" id="count" name="count" value="1" min="1" max="99">
-                        </div>
-
-                        <!-- Image Upload -->
-                        <div class="form-group full-width">
-                            <label>Image (optional)</label>
-                            <label for="imageUpload" class="file-input-wrapper" id="fileInputWrapper">
-                                <div>Tap to select an image</div>
-                                <div id="fileName">No file chosen</div>
-                            </label>
-                            <input type="file" id="imageUpload" name="imageFile" accept="image/png, image/jpeg, image/gif" style="display:none;">
-                            <div id="uploadPreviewContainer" style="display: none;">
-                                <img id="uploadPreviewImage" src="#" alt="Selected image">
-                                <button type="button" id="removeImageButton">Remove Image</button>
-                            </div>
-                        </div>
-                    </div>
-                </details>
+        <!-- Row 2: Label Size | Padding -->
+        <div class="option-row">
+            <div class="option-group">
+                <div class="option-label">Label Size</div>
+                <select id="labelSizeSelect"></select>
             </div>
+            <div class="option-group">
+                <div class="option-label">Padding (px)</div>
+                <input type="number" id="padding" name="padding" value="0" min="0" max="100">
+            </div>
+        </div>
+
+        <!-- Row 3: Top/Bottom Text | Side Text -->
+        <div class="option-row">
+            <div class="option-group">
+                <div class="option-label">Top/Bottom Text</div>
+                <input type="text" id="border_message" name="border_message" placeholder="Optional">
+            </div>
+            <div class="option-group">
+                <div class="option-label">Side Text (Vertical)</div>
+                <input type="text" id="side_border" name="side_border" placeholder="Margin text">
+            </div>
+        </div>
+
+        <!-- Image Upload -->
+        <div class="option-group">
+            <div class="option-label">Add Logo/Image</div>
+            <label for="imageUpload" class="upload-area" id="fileInputWrapper">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+                </svg>
+                <div>Tap to upload SVG or PNG</div>
+            </label>
+            <input type="file" id="imageUpload" name="imageFile" accept="image/png,image/jpeg,image/gif,image/svg+xml" style="display:none;">
+            <div id="uploadPreviewContainer" style="display:none;">
+                <img id="uploadPreviewImage" src="#" alt="Selected image">
+                <button type="button" id="removeImageButton">Remove Image</button>
+            </div>
+        </div>
+
+        <!-- Floating print button -->
+        <div class="print-btn-dock">
+            <button type="submit" id="submitButton" class="print-btn" disabled>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+                </svg>
+                Print Label
+            </button>
         </div>
     </form>
 </div>
@@ -118,7 +125,6 @@
 
     // --- IMAGE UPLOAD ELEMENTS ---
     const imageUploadInput = document.getElementById('imageUpload');
-    const fileNameDisplay = document.getElementById('fileName');
     const fileInputWrapper = document.getElementById('fileInputWrapper');
     const uploadPreviewContainer = document.getElementById('uploadPreviewContainer');
     const uploadPreviewImage = document.getElementById('uploadPreviewImage');
@@ -133,20 +139,89 @@
     let uploadedImageSig = null;
     let printCooldownActive = false;
 
+    // --- SEGMENTED CONTROL FOR COLUMNS ---
+    const columnsControl = document.getElementById('columnsControl');
+    const columnsInput = document.getElementById('columns');
+
+    columnsControl.addEventListener('click', (e) => {
+        const btn = e.target.closest('.seg-btn');
+        if (!btn) return;
+        columnsControl.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        columnsInput.value = btn.dataset.value;
+        onColumnsChanged();
+    });
+
+    function setColumnsControl(val) {
+        const v = String(val);
+        columnsInput.value = v;
+        columnsControl.querySelectorAll('.seg-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.value === v);
+        });
+    }
+
+    // --- LABEL SIZE SELECTOR ---
+    const labelSizeSelect = document.getElementById('labelSizeSelect');
+    const LABEL_SIZES = window.LABEL_SIZES || [
+        { id: '1x3', width: 3, height: 1, label: '3\u2033 \u00d7 1\u2033', default: true },
+        { id: '2.25x1', width: 2.25, height: 1, label: '2.25\u2033 \u00d7 1\u2033' },
+        { id: '2.25x1.25', width: 2.25, height: 1.25, label: '2.25\u2033 \u00d7 1.25\u2033' },
+        { id: '2x2', width: 2, height: 2, label: '2\u2033 Circle', shape: 'circle' },
+        { id: '4x6', width: 4, height: 6, label: '4\u2033 \u00d7 6\u2033' },
+    ];
+
+    LABEL_SIZES.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.label;
+        opt.dataset.width = s.width;
+        opt.dataset.height = s.height;
+        if (s.shape) opt.dataset.shape = s.shape;
+        if (s.default) opt.selected = true;
+        labelSizeSelect.appendChild(opt);
+    });
+
+    window.getSelectedLabelSize = () => labelSizeSelect.value || '1x3';
+    window.getSelectedLabelDimensions = () => {
+        const opt = labelSizeSelect.options[labelSizeSelect.selectedIndex];
+        return {
+            width: parseFloat(opt.dataset.width) || 3,
+            height: parseFloat(opt.dataset.height) || 1,
+            shape: opt.dataset.shape || null
+        };
+    };
+    window.setLabelSize = (sizeId) => {
+        const opt = labelSizeSelect.querySelector(`option[value="${sizeId}"]`);
+        if (opt) labelSizeSelect.value = sizeId;
+        updatePreviewAspectRatio();
+        schedulePreviewDebounced();
+    };
+
+    labelSizeSelect.addEventListener('change', () => {
+        updatePreviewAspectRatio();
+        updateQueryParams();
+        schedulePreviewDebounced();
+    });
+
     // --- DYNAMIC COLUMN INPUTS ---
     function getColumnCount() {
-        return parseInt(document.getElementById('columns').value) || 1;
+        return parseInt(columnsInput.value) || 1;
     }
 
     function renderMessageInputs(count) {
-        // Preserve existing values
         const existing = {};
         messageContainer.querySelectorAll('input[type="text"]').forEach(el => {
             existing[el.id] = el.value;
         });
-
         messageContainer.innerHTML = '';
+        if (count > 1) {
+            messageContainer.classList.add('multi-column');
+        } else {
+            messageContainer.classList.remove('multi-column');
+        }
         for (let i = 1; i <= count; i++) {
+            const wrap = document.createElement('div');
+            wrap.className = 'message-field';
             const label = document.createElement('label');
             label.setAttribute('for', `message_${i}`);
             label.textContent = count === 1 ? 'Message' : `Column ${i}`;
@@ -155,11 +230,10 @@
             input.id = `message_${i}`;
             input.name = `message_${i}`;
             input.placeholder = count === 1 ? "What's on the label?" : `Column ${i} text`;
-            if (existing[`message_${i}`] !== undefined) {
-                input.value = existing[`message_${i}`];
-            }
-            messageContainer.appendChild(label);
-            messageContainer.appendChild(input);
+            if (existing[`message_${i}`] !== undefined) input.value = existing[`message_${i}`];
+            wrap.appendChild(label);
+            wrap.appendChild(input);
+            messageContainer.appendChild(wrap);
         }
     }
 
@@ -170,29 +244,48 @@
     }
 
     // --- QUERY PARAMETER HANDLING ---
+    function updateQueryParams() {
+        const params = new URLSearchParams();
+        const colCount = getColumnCount();
+        for (let i = 1; i <= colCount; i++) {
+            const el = document.getElementById(`message_${i}`);
+            if (el && el.value) params.set(colCount === 1 ? 'message' : `msg${i}`, el.value);
+        }
+        if (!document.getElementById('show_date').checked) params.set('date', '0');
+        if (!document.getElementById('border').checked) params.set('border', '0');
+        const borderMessage = document.getElementById('border_message').value;
+        if (borderMessage) params.set('border_message', borderMessage);
+        const sideBorder = document.getElementById('side_border').value;
+        if (sideBorder) params.set('side_border', sideBorder);
+        const count = document.getElementById('count').value;
+        if (count && count !== '1') params.set('count', count);
+        if (colCount > 1) params.set('columns', colCount);
+        const padding = document.getElementById('padding').value;
+        if (padding && padding !== '0') params.set('padding', padding);
+        const size = window.getSelectedLabelSize ? window.getSelectedLabelSize() : '1x3';
+        if (size && size !== '1x3') params.set('size', size);
+        const qs = params.toString();
+        history.replaceState(null, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+    }
+
     function applyQueryParams() {
         const params = new URLSearchParams(window.location.search);
         if (!params.toString()) return;
 
-        // Apply columns first so inputs exist
         if (params.has('columns')) {
-            document.getElementById('columns').value = params.get('columns');
+            setColumnsControl(params.get('columns'));
             renderMessageInputs(parseInt(params.get('columns')) || 1);
         }
-
-        // Legacy single message param
         if (params.has('message')) {
             const el = document.getElementById('message_1');
             if (el) el.value = params.get('message');
         }
-        // Per-column message params (msg1, msg2, ...)
         for (let i = 1; i <= 6; i++) {
             if (params.has(`msg${i}`)) {
                 const el = document.getElementById(`message_${i}`);
                 if (el) el.value = params.get(`msg${i}`);
             }
         }
-
         if (params.has('date'))
             document.getElementById('show_date').checked = params.get('date') !== '0';
         if (params.has('border'))
@@ -205,57 +298,17 @@
             document.getElementById('count').value = params.get('count');
         if (params.has('padding'))
             document.getElementById('padding').value = params.get('padding');
-
         if (params.has('size')) {
             setTimeout(() => {
-                if (window.setLabelSize) window.setLabelSize(params.get('size'));
-            }, 150);
-        }
-
-        const advancedParams = ['border_message', 'side_border', 'padding'];
-        const hasAdvanced = advancedParams.some(p => {
-            const v = params.get(p);
-            if (p === 'padding') return v && v !== '0';
-            return v && v.trim() !== '';
-        });
-        if (hasAdvanced) {
-            document.getElementById('advancedOptions').open = true;
+                const opt = labelSizeSelect.querySelector(`option[value="${params.get('size')}"]`);
+                if (opt) labelSizeSelect.value = params.get('size');
+            }, 50);
         }
     }
 
-    function updateQueryParams() {
-        const params = new URLSearchParams();
-        const colCount = getColumnCount();
-
-        // Save per-column messages
-        for (let i = 1; i <= colCount; i++) {
-            const el = document.getElementById(`message_${i}`);
-            if (el && el.value) params.set(colCount === 1 ? 'message' : `msg${i}`, el.value);
-        }
-
-        if (!document.getElementById('show_date').checked) params.set('date', '0');
-        if (!document.getElementById('border').checked) params.set('border', '0');
-
-        const borderMessage = document.getElementById('border_message').value;
-        if (borderMessage) params.set('border_message', borderMessage);
-        const sideBorder = document.getElementById('side_border').value;
-        if (sideBorder) params.set('side_border', sideBorder);
-        const count = document.getElementById('count').value;
-        if (count && count !== '1') params.set('count', count);
-        if (colCount > 1) params.set('columns', colCount);
-        const padding = document.getElementById('padding').value;
-        if (padding && padding !== '0') params.set('padding', padding);
-        const size = window.getSelectedLabelSize ? window.getSelectedLabelSize() : '1x3';
-        if (size && size !== '1x3') params.set('size', size);
-
-        const qs = params.toString();
-        const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-        history.replaceState(null, '', newUrl);
-    }
-
-    // Apply query params on load
     applyQueryParams();
 
+    // --- PREVIEW HELPERS ---
     function updatePrintButtonState() {
         submitButton.disabled = !previewReady || printCooldownActive;
     }
@@ -276,12 +329,12 @@
         const sig = fileSignature(file);
         if (!file) { uploadedImagePath = null; uploadedImageSig = null; return null; }
         if (uploadedImageSig === sig && uploadedImagePath) return uploadedImagePath;
-        const imageUploadData = new FormData();
-        imageUploadData.append('imageFile', file);
-        const uploadResponse = await fetch('/api/upload', { method: 'POST', body: imageUploadData });
-        const uploadResult = await uploadResponse.json().catch(() => ({ error: 'Invalid response' }));
-        if (!uploadResponse.ok) throw new Error(uploadResult.error || 'Image upload failed.');
-        uploadedImagePath = uploadResult.filePath;
+        const fd = new FormData();
+        fd.append('imageFile', file);
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json().catch(() => ({ error: 'Invalid response' }));
+        if (!res.ok) throw new Error(data.error || 'Image upload failed.');
+        uploadedImagePath = data.filePath;
         uploadedImageSig = sig;
         return uploadedImagePath;
     }
@@ -291,12 +344,10 @@
         const formData = new FormData(printForm);
         const colCount = getColumnCount();
 
-        // Collect per-column messages
         const messages = [];
         for (let i = 1; i <= colCount; i++) {
             messages.push((formData.get(`message_${i}`) || '').toString().trim());
         }
-
         if (colCount > 1) {
             printPayload.messages = messages;
             printPayload.columns = colCount;
@@ -304,28 +355,19 @@
             if (messages[0]) printPayload.message = messages[0];
         }
 
-        const raw = {
-            border_message: (formData.get('border_message') || '').toString(),
-            side_border: (formData.get('side_border') || '').toString(),
-            count: (formData.get('count') || '').toString(),
-            padding: (formData.get('padding') || '').toString(),
-        };
+        const borderMsg = (formData.get('border_message') || '').toString().trim();
+        const sideMsg = (formData.get('side_border') || '').toString().trim();
+        const countVal = parseInt((formData.get('count') || '1').toString()) || 1;
+        const paddingVal = parseInt((formData.get('padding') || '0').toString()) || 0;
 
-        if (raw.border_message.trim() !== '') printPayload.border_message = raw.border_message.trim();
-        if (raw.side_border.trim() !== '') printPayload.side_border = raw.side_border.trim();
-        printPayload.count = parseInt(raw.count.trim()) || 1;
-        const borderEl = document.getElementById('border');
-        printPayload.border = !!(borderEl && borderEl.checked);
-        const showDateEl = document.getElementById('show_date');
-        printPayload.show_date = !!(showDateEl && showDateEl.checked);
+        if (borderMsg) printPayload.border_message = borderMsg;
+        if (sideMsg) printPayload.side_border = sideMsg;
+        printPayload.count = countVal;
+        printPayload.border = !!document.getElementById('border').checked;
+        printPayload.show_date = !!document.getElementById('show_date').checked;
         if (uploadedImagePath) printPayload.image = uploadedImagePath;
-
-        const paddingValue = parseInt(raw.padding.trim()) || 0;
-        if (paddingValue > 0) printPayload.padding = paddingValue;
-
-        if (window.getSelectedLabelSize) {
-            printPayload.label_size = window.getSelectedLabelSize();
-        }
+        if (paddingVal > 0) printPayload.padding = paddingVal;
+        if (window.getSelectedLabelSize) printPayload.label_size = window.getSelectedLabelSize();
 
         return printPayload;
     }
@@ -337,7 +379,7 @@
             try {
                 await new Promise((resolve, reject) => {
                     const img = new Image();
-                    img.onload = () => resolve();
+                    img.onload = resolve;
                     img.onerror = reject;
                     img.src = testUrl;
                 });
@@ -366,9 +408,7 @@
             if (!res.ok) throw new Error(body.errors ? body.errors.join(', ') : body.error || 'Preview failed.');
             let url = body.preview_url;
             lastPreviewPath = body.preview_path || null;
-            if (!url) {
-                url = await pollForPreview();
-            }
+            if (!url) url = await pollForPreview();
             if (!url) throw new Error('No preview available.');
             previewImage.src = `${url}&t=${Date.now()}`;
             previewImage.style.display = 'block';
@@ -391,11 +431,10 @@
         }
     }
 
-    // --- EVENT LISTENER FOR FILE SELECTION ---
+    // --- IMAGE UPLOAD ---
     imageUploadInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (file && file.type.startsWith('image/')) {
-            fileNameDisplay.textContent = file.name;
             const reader = new FileReader();
             reader.onload = (e) => {
                 uploadPreviewImage.src = e.target.result;
@@ -407,44 +446,31 @@
         schedulePreviewDebounced();
     });
 
-    // --- EVENT LISTENER FOR REMOVE BUTTON ---
     removeImageButton.addEventListener('click', () => {
         imageUploadInput.value = '';
         uploadPreviewContainer.style.display = 'none';
-        fileInputWrapper.style.display = 'block';
-        fileNameDisplay.textContent = 'No file chosen';
+        fileInputWrapper.style.display = '';
         uploadedImagePath = null;
         uploadedImageSig = null;
         schedulePreviewDebounced();
     });
 
-    // --- COLUMNS CHANGE ---
-    document.getElementById('columns').addEventListener('change', onColumnsChanged);
-    document.getElementById('columns').addEventListener('input', onColumnsChanged);
-
-    // --- AUTOPREVIEW ON INPUT CHANGES ---
+    // --- INPUT CHANGE HANDLERS ---
     printForm.addEventListener('input', (e) => {
         const target = e.target;
         if (!target || !(target instanceof HTMLElement)) return;
+        if (['border', 'show_date', 'columns'].includes(target.id)) return;
         const tag = target.tagName.toLowerCase();
-        if (['border','show_date','date','columns'].includes(target.id)) return;
         if (tag === 'input' || tag === 'textarea' || tag === 'select') {
             updateQueryParams();
             schedulePreviewDebounced();
         }
     });
 
-    // Trigger preview immediately on border/show_date toggles (no debounce)
-    document.getElementById('border').addEventListener('change', () => {
-        updateQueryParams();
-        generatePreview();
-    });
-    document.getElementById('show_date').addEventListener('change', () => {
-        updateQueryParams();
-        generatePreview();
-    });
+    document.getElementById('border').addEventListener('change', () => { updateQueryParams(); generatePreview(); });
+    document.getElementById('show_date').addEventListener('change', () => { updateQueryParams(); generatePreview(); });
 
-    // --- EVENT LISTENER FOR PRINT SUBMISSION ---
+    // --- PRINT SUBMISSION ---
     printForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (!previewReady) { updateStatus('Generate a preview first.', 'error'); return; }
@@ -466,26 +492,19 @@
                 delete printPayload.preview_only;
                 if (uploadedImagePath) printPayload.image = uploadedImagePath;
             }
-
-            // Get selected label size
-            if (window.getSelectedLabelSize) {
-                printPayload.label_size = window.getSelectedLabelSize();
-            }
-
+            if (window.getSelectedLabelSize) printPayload.label_size = window.getSelectedLabelSize();
             if (window.bumpJobsBadge) window.bumpJobsBadge();
-            const printResponse = await fetch('/api/pi-label/print', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+
+            const res = await fetch('/api/pi-label/print', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(printPayload)
             });
-            const printResult = await printResponse.json().catch(() => ({ error: 'Invalid response' }));
-            if (!printResponse.ok) {
-                const errorMsg = printResult.errors ? printResult.errors.join(', ') : printResult.error;
-                throw new Error(errorMsg || 'Print command failed.');
-            }
+            const result = await res.json().catch(() => ({ error: 'Invalid response' }));
+            if (!res.ok) throw new Error(result.errors ? result.errors.join(', ') : result.error || 'Print failed.');
+
             updateStatus('Label sent to printer!', 'success');
-            if (printResult.preview_url) {
-                previewImage.src = `${printResult.preview_url}&t=${Date.now()}`;
+            if (result.preview_url) {
+                previewImage.src = `${result.preview_url}&t=${Date.now()}`;
                 previewImage.style.display = 'block';
             }
             printCooldownActive = true;
@@ -497,7 +516,6 @@
                 submitButton.innerHTML = originalText;
                 updatePrintButtonState();
             }, 3000);
-            return;
         } catch (error) {
             updateStatus(`Error: ${error.message}`, 'error');
             submitButton.innerHTML = originalText;
@@ -513,40 +531,28 @@
         statusMessage.style.visibility = message ? 'visible' : 'hidden';
     }
 
-    // Kick off an initial preview
-    schedulePreviewDebounced();
-
-    // Update preview aspect ratio and shape based on label size
+    // --- PREVIEW ASPECT RATIO ---
     function updatePreviewAspectRatio() {
         const dims = window.getSelectedLabelDimensions ? window.getSelectedLabelDimensions() : { width: 3, height: 1 };
         const container = document.getElementById('previewContainer');
         if (container) {
             container.style.aspectRatio = `${dims.width} / ${dims.height}`;
-            // Circle labels get rounded preview
-            if (dims.shape === 'circle') {
-                container.classList.add('circle-preview');
-            } else {
-                container.classList.remove('circle-preview');
-            }
+            container.classList.toggle('circle-preview', dims.shape === 'circle');
         }
         updateQueryParams();
     }
 
-    // Listen for label size changes
-    window.addEventListener('labelsizechange', () => {
-        updatePreviewAspectRatio();
-        schedulePreviewDebounced();
-    });
-
-    // Set initial aspect ratio after header renders
+    window.addEventListener('labelsizechange', () => { updatePreviewAspectRatio(); schedulePreviewDebounced(); });
     setTimeout(updatePreviewAspectRatio, 100);
+
+    // --- INIT ---
+    schedulePreviewDebounced();
 
     // Global hotkey: 'p' to print
     document.addEventListener('keydown', (ev) => {
         const t = ev.target;
-        if (t && ((t.tagName === 'INPUT') || (t.tagName === 'TEXTAREA') || (t.isContentEditable))) return;
-        if ((ev.key || '').toLowerCase() !== 'p') return;
-        if (!previewReady) return;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        if ((ev.key || '').toLowerCase() !== 'p' || !previewReady) return;
         ev.preventDefault();
         submitButton.click();
     }, { passive: false });
